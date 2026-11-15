@@ -163,6 +163,8 @@ model User {
   botDialog                  TelegramBotDialog?
   /// Якорь экрана очереди обращений в боте: какое сообщение обновлять при новых тикетах
   adminQueueBotMessageId       Int?
+  /// Якорь единого окна бота: последнее экранное сообщение, которое правится при навигации
+  botScreenMessageId           Int?
 
   @@index([email])
   @@index([role])

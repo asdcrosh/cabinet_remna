@@ -104,9 +104,14 @@ export function MiniApp({ demo = false }: { demo?: boolean }) {
           // Возврат со страницы ЮKassa: оплата прошла внутри Telegram, подтверждаем здесь же.
           if (params.get('paid') === '1') setNotice('Оплата получена. Подписка обновится автоматически — обычно это занимает меньше минуты.')
           const requestedPlan = params.get('plan')
-          if (requestedPlan && result.plans.some(item => item.id === requestedPlan && !item.isPromo)) { setTab('plans'); setCheckoutPlanId(requestedPlan) }
+          const requestedPromo = params.get('promo')?.trim()
+          if (requestedPlan && result.plans.some(item => item.id === requestedPlan && !item.isPromo)) {
+            setTab('plans'); setCheckoutPlanId(requestedPlan)
+            // Ссылка из бота с применённым промокодом: предзаполняем поле, чтобы скидка применилась автоматически.
+            if (requestedPromo) setPromoCodes(previous => ({ ...previous, [requestedPlan]: requestedPromo }))
+          }
           if (params.get('paid') || requestedPlan) {
-            for (const key of ['paid', 'payment', 'plan']) params.delete(key)
+            for (const key of ['paid', 'payment', 'plan', 'promo']) params.delete(key)
             const query = params.toString()
             history.replaceState(null, '', `${window.location.pathname}${query ? `?${query}` : ''}`)
           }

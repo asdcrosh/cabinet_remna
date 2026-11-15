@@ -3,6 +3,7 @@ import { getMiniAppOverview } from './overview'
 import { buildAdminTicketsScreen, buildBroadcastThemesScreen, buildRichScreen, buildRichPaymentScreen, buildSupportThreadScreen, type BotScreen, type BotThreadMessage, type RichScreenInput } from './rich-screens'
 import { broadcastThemes, broadcastThemeView } from './broadcast-bot'
 import { miniAppUrl } from './config'
+import { botSupportAttachmentUrl } from './attachment-sign'
 import { channelCampaign } from './channel-referrals'
 import { ensureUserReferralCode } from '@/lib/referrals'
 import { syncLocalDevicesFromRemnawave } from '@/lib/remnawave-device-sync'
@@ -32,8 +33,13 @@ export async function getBotScreenInput(telegramId: number, screen: BotScreen, n
         await syncLocalDevicesFromRemnawave({ localUserId: user.id, reference: remnawaveUserReference(user) })
       } catch { input.notice = 'Не удалось обновить список устройств. Показаны сохранённые данные.' }
       const devices = await prisma.device.findMany({ where: { userId: user.id }, orderBy: { lastSeenAt: 'desc' }, take: 8,
-        select: { id: true, displayName: true, platform: true } })
-      input.devices = devices.map(device => ({ id: device.id, title: device.displayName || 'Устройство', platform: device.platform || 'VPN-клиент' }))
+        select: { id: true, displayName: true, platform: true, lastSeenAt: true } })
+      // Без имени устройство подписываем платформой и датой — на кнопке сразу видно, что это.
+      input.devices = devices.map(device => ({
+        id: device.id,
+        title: device.displayName || `${device.platform || 'Устройство'} · ${formatDate(device.lastSeenAt)}`,
+        platform: device.platform || 'VPN-клиент',
+      }))
     }
     if (screen === 'connect' && user.remnawaveUsername) {
       try {
@@ -110,7 +116,7 @@ export async function getBotScreenInput(telegramId: number, screen: BotScreen, n
 }
 
 // Промокоды, выданные пользователю и ещё не использованные им.
-async function getBotPromoCodes(userId: string) {
+export async function getBotPromoCodes(userId: string) {
   const [openings, welcomes, merges] = await Promise.all([
     prisma.bonusBoxOpening.findMany({ where: { userId, promoCodeId: { not: null } },
       select: { promoCode: { select: { code: true } } }, orderBy: { createdAt: 'desc' }, take: 20 }),
@@ -136,11 +142,31 @@ export async function getBotScreen(telegramId: number, screen: BotScreen, notice
   return buildRichScreen(await getBotScreenInput(telegramId, screen, notice, referralCode))
 }
 
-export async function getBotPaymentScreen(telegramId: number, planId: string) {
+export async function getBotPaymentScreen(telegramId: number, planId: string, promo?: { code: string; discountPercent: number } | null) {
   const [input, yookassaAvailable] = await Promise.all([
     getBotScreenInput(telegramId, 'plans'), isYookassaConfigured(),
   ])
-  return buildRichPaymentScreen(input, planId, yookassaAvailable)
+  return buildRichPaymentScreen(input, planId, yookassaAvailable, promo ?? null)
+}
+
+// Проверяет, что промокод доступен именно этому пользователю (выдан ему и не использован).
+// Коды нечувствительны к регистру — в системе хранятся как есть, сравниваем в верхнем регистре.
+export async function validateBotPromoCode(telegramId: number, code: string) {
+  const account = await prisma.user.findUnique({ where: { telegramId: BigInt(telegramId) }, select: { id: true } })
+  if (!account) return null
+  const wanted = code.trim().toUpperCase()
+  const promos = await getBotPromoCodes(account.id)
+  const promo = promos.find(item => item.code.toUpperCase() === wanted)
+  return promo ? { code: promo.code, discountPercent: promo.discountPercent } : null
+}
+
+// Экран тарифов с применённым промокодом: цены со скидкой, оплата передаёт код дальше.
+export async function getBotPlansPromoScreen(telegramId: number, code: string) {
+  const promo = await validateBotPromoCode(telegramId, code)
+  if (!promo) return getBotScreen(telegramId, 'bonus', 'Промокод недоступен — возможно, он уже использован или истёк')
+  const input = await getBotScreenInput(telegramId, 'plans')
+  input.activePromo = promo
+  return buildRichScreen(input)
 }
 
 // Переписка по обращению для экрана бота. Помечает тикет прочитанным пользователю.
@@ -151,7 +177,8 @@ export async function getBotSupportThreadScreen(telegramId: number, ticketId: st
     where: { id: ticketId, userId: account.id },
     select: { id: true, subject: true, status: true, updatedAt: true, satisfactionRating: true,
       messages: { orderBy: { createdAt: 'desc' }, take: 6,
-        select: { body: true, senderRole: true, createdAt: true, attachments: { select: { fileName: true } } } } },
+        select: { body: true, senderRole: true, createdAt: true,
+          attachments: { select: { id: true, fileName: true, mimeType: true } } } } },
   }) : null
   if (!ticket) return getBotScreen(telegramId, 'support', 'Обращение не найдено')
   if (ticket.status !== 'CLOSED') {
@@ -161,7 +188,10 @@ export async function getBotSupportThreadScreen(telegramId: number, ticketId: st
     from: message.senderRole === 'USER' ? 'user' : 'admin',
     body: message.body.length > 500 ? `${message.body.slice(0, 500)}…` : message.body,
     date: formatDate(message.createdAt),
-    attachments: message.attachments.map(file => file.fileName),
+    attachments: message.attachments.map(file => ({
+      fileName: file.fileName,
+      imageUrl: file.mimeType.startsWith('image/') ? botSupportAttachmentUrl(file.id) : null,
+    })),
   }))
   return buildSupportThreadScreen(input, { id: ticket.id, subject: ticket.subject, status: ticketStatusLabel(ticket.status),
     rating: ticket.satisfactionRating == null ? null : ticket.satisfactionRating >= 5 ? 'up' : 'down', messages })
@@ -216,7 +246,8 @@ export async function getBotAdminThreadScreen(telegramId: number, ticketId: stri
       user: { select: { name: true, telegramUsername: true, email: true } },
       assignee: { select: { name: true, telegramUsername: true, email: true } },
       messages: { orderBy: { createdAt: 'desc' }, take: 6,
-        select: { body: true, senderRole: true, createdAt: true, attachments: { select: { fileName: true } } } },
+        select: { body: true, senderRole: true, createdAt: true,
+          attachments: { select: { id: true, fileName: true, mimeType: true } } } },
     },
   })
   if (!ticket) return getBotAdminTicketsScreen(telegramId, 'Обращение не найдено')
@@ -226,7 +257,10 @@ export async function getBotAdminThreadScreen(telegramId: number, ticketId: stri
     from: message.senderRole === 'USER' ? 'user' : 'admin',
     body: message.body.length > 500 ? `${message.body.slice(0, 500)}…` : message.body,
     date: formatDate(message.createdAt),
-    attachments: message.attachments.map(file => file.fileName),
+    attachments: message.attachments.map(file => ({
+      fileName: file.fileName,
+      imageUrl: file.mimeType.startsWith('image/') ? botSupportAttachmentUrl(file.id) : null,
+    })),
   }))
   return buildSupportThreadScreen(input, {
     id: ticket.id,

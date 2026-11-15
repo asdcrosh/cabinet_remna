@@ -7,7 +7,7 @@ export const botScreens: BotScreen[] = ['home', 'subscription', 'plans', 'billin
 export type BotDevice = { id: string; title: string; platform: string }
 export type BotSpinResult = { prizeTitle: string; prizeDescription: string | null; promoCode: string | null; promoCodeExpiresAt: string | null; remainingAttempts: number }
 export type BotTicket = { id: string; subject: string; status: string }
-export type BotThreadMessage = { from: 'user' | 'admin'; body: string; date: string; attachments?: string[] }
+export type BotThreadMessage = { from: 'user' | 'admin'; body: string; date: string; attachments?: Array<{ fileName: string; imageUrl?: string | null }> }
 export type BotPromoCode = { code: string; discountPercent: number; expiresAt: string | null }
 export type RichScreenInput = {
   screen: BotScreen
@@ -22,6 +22,8 @@ export type RichScreenInput = {
   autoRenewalActive?: boolean
   bonus?: { enabled: boolean; attempts: number }
   promoCodes?: BotPromoCode[]
+  /// Промокод, применённый к экрану тарифов и оплаты (выбран нажатием в боте)
+  activePromo?: { code: string; discountPercent: number } | null
   connectUrl?: string | null
   inbox?: { unread: number; items: Array<{ title: string; date: string; fresh: boolean }> }
   prefs?: { telegram: boolean; email: boolean; broadcasts: boolean }
@@ -81,16 +83,28 @@ export function buildRichScreen(input: RichScreenInput) {
         row(cb('📱 Устройства', 'devices'), cb('💳 Платежи', 'billing')),
         row(cb('🎁 Бонусы', 'bonus'), cb('🔔 Уведомления', 'notifications')))
       break
-    case 'plans':
+    case 'plans': {
+      const promo = input.activePromo ?? null
+      if (promo) parts.push(`<p>🏷 Промокод <b>${escape(promo.code)}</b> применён: скидка ${promo.discountPercent}% уже учтена в ценах ниже.</p>`)
       if (!data.plans.length) parts.push('<p>Для вашего аккаунта сейчас нет доступных тарифов.</p>')
-      for (const plan of data.plans) parts.push('<hr>', `<h4>${plan.current ? '✅ Ваш тариф · ' : '💎 '}${escape(plan.name)}</h4>`, table([
-        ['⏳ Срок', plan.unlimited ? 'Без ограничения' : `${plan.days} дней`],
-        ['📱 Устройства', plan.unlimitedDevices ? 'Без ограничения' : plan.deviceAddonEnabled ? `${plan.devices}–${plan.maxDevices}` : String(plan.initialDevices)],
-        ['🌐 Трафик', plan.trafficLimitGb == null ? 'Без ограничения' : `${plan.trafficLimitGb} ГБ`],
-      ]), `<p>${plan.isPromo ? '🎁 Бесплатно' : `💰 ${escape(formatPrice(plan.priceKopecks))}`}</p>`,
-      row(cb(plan.isPromo ? '🎁 Получить доступ' : plan.current ? '🔄 Продлить тариф' : '💳 Оформить тариф', plan.isPromo ? `buy:${plan.id}` : `pay:${plan.id}`, 'success')))
+      for (const plan of data.plans) {
+        const discounted = promo && !plan.isPromo ? Math.round(plan.priceKopecks * (100 - promo.discountPercent) / 100) : null
+        const priceLine = plan.isPromo ? '🎁 Бесплатно'
+          : discounted != null ? `💰 <s>${escape(formatPrice(plan.priceKopecks))}</s> <b>${escape(formatPrice(discounted))}</b>`
+          : `💰 ${escape(formatPrice(plan.priceKopecks))}`
+        const action = plan.isPromo ? cb('🎁 Получить доступ', `buy:${plan.id}`, 'success')
+          : promo ? cb(plan.current ? `🔄 Продлить −${promo.discountPercent}%` : `💳 Оформить −${promo.discountPercent}%`, `payp:${plan.id}:${promo.code}`, 'success')
+          : cb(plan.current ? '🔄 Продлить тариф' : '💳 Оформить тариф', `pay:${plan.id}`, 'success')
+        parts.push('<hr>', `<h4>${plan.current ? '✅ Ваш тариф · ' : '💎 '}${escape(plan.name)}</h4>`, table([
+          ['⏳ Срок', plan.unlimited ? 'Без ограничения' : `${plan.days} дней`],
+          ['📱 Устройства', plan.unlimitedDevices ? 'Без ограничения' : plan.deviceAddonEnabled ? `${plan.devices}–${plan.maxDevices}` : String(plan.initialDevices)],
+          ['🌐 Трафик', plan.trafficLimitGb == null ? 'Без ограничения' : `${plan.trafficLimitGb} ГБ`],
+        ]), `<p>${priceLine}</p>`, row(action))
+      }
+      if (promo) parts.push(row(cb('✖️ Убрать промокод', 'plans')))
       parts.push('<hr><p>Продление того же тарифа добавляет дни. При смене тарифа начинается новый срок: остаток прежнего не переносится.</p>')
       break
+    }
     case 'billing': {
       parts.push(`<h4>${statusDot(sub)} ${escape(sub?.title || 'Подписка пока не оформлена')}</h4>`)
       if (input.autoRenewal) parts.push(`<p>🔁 Автопродление: ${escape(input.autoRenewal)}</p>`)
@@ -143,8 +157,10 @@ export function buildRichScreen(input: RichScreenInput) {
         parts.push('<h4>🏷 Ваши промокоды</h4>',
           table(input.promoCodes.map(promo => [`${promo.code} · −${promo.discountPercent}%`,
             promo.expiresAt ? `до ${new Date(promo.expiresAt).toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow' })}` : 'без срока'])),
-          '<p>Промокод применяется при оплате тарифа — выберите его на экране оплаты.</p>')
-        for (const promo of input.promoCodes.slice(0, 3)) parts.push(row(copyBtn(`📋 Скопировать ${promo.code}`, promo.code)))
+          '<p>Нажмите на промокод — тарифы откроются уже со скидкой, останется выбрать способ оплаты.</p>')
+        for (const promo of input.promoCodes.slice(0, 3)) {
+          parts.push(row(cb(`🏷 Применить ${promo.code} · −${promo.discountPercent}%`, `promo:${promo.code}`, 'success')))
+        }
       }
       if (data.referrals) parts.push(row(cb('🤝 Пригласить друга', 'referrals')))
       break
@@ -316,9 +332,14 @@ export function buildSupportThreadScreen(input: RichScreenInput, thread: { id: s
     for (const message of thread.messages) {
       const author = message.from === 'admin' ? (viewer === 'admin' ? 'Вы' : '🛟 Поддержка') : (viewer === 'admin' ? '👤 Пользователь' : 'Вы')
       const files = message.attachments && message.attachments.length > 0
-        ? `<br>📎 ${escape(message.attachments.join(', '))}`
+        ? `<br>📎 ${escape(message.attachments.map(file => file.fileName).join(', '))}`
         : ''
-      parts.push(`<p>${author} · ${escape(message.date)}<br>${escape(message.body)}${files}</p>`)
+      // Каждое сообщение — отдельный блок с автором: переписка не сливается в ленту.
+      parts.push(`<p><b>${author}</b> · ${escape(message.date)}</p><blockquote>${escape(message.body)}${files}</blockquote>`)
+      // Фото из вложений показываем прямо в окне по подписанной ссылке.
+      for (const file of message.attachments ?? []) {
+        if (file.imageUrl) parts.push(`<img src="${escape(file.imageUrl)}">`)
+      }
     }
   }
   if (thread.status !== 'Закрыто') {
@@ -444,24 +465,32 @@ export function buildAutoRenewalOffConfirm(input: RichScreenInput) {
   return parts.join('')
 }
 
-export function buildRichPaymentScreen(input: RichScreenInput, planId: string, yookassaAvailable: boolean) {
+export function buildRichPaymentScreen(input: RichScreenInput, planId: string, yookassaAvailable: boolean,
+  promo?: { code: string; discountPercent: number } | null) {
   const plan = input.overview?.plans.find(item => item.id === planId && !item.isPromo)
   if (!plan) return `${brandHeader(input.bannerUrl)}<h3>💳 Тариф недоступен</h3><p>Откройте актуальный список тарифов.</p>${row(cb('💎 К тарифам', 'plans'))}`
   const checkoutUrl = new URL(input.appUrl)
   checkoutUrl.searchParams.set('tab', 'plans')
   checkoutUrl.searchParams.set('plan', plan.id)
+  if (promo) checkoutUrl.searchParams.set('promo', promo.code)
+  const discounted = promo ? Math.round(plan.priceKopecks * (100 - promo.discountPercent) / 100) : null
   const parts = [
     `${brandHeader(input.bannerUrl)}<h3>💳 Способ оплаты</h3>`,
     `<h4>💎 ${escape(plan.name)}</h4>`,
     table([
       ['⏳ Срок', plan.unlimited ? 'Бессрочно' : `${plan.days} дней`],
-      ['💰 Базовая стоимость', formatPrice(plan.priceKopecks)],
+      ...(promo && discounted != null
+        ? [['🏷 Промокод', `${promo.code} · −${promo.discountPercent}%`], ['💰 К оплате', formatPrice(discounted)]]
+        : [['💰 Базовая стоимость', formatPrice(plan.priceKopecks)]]),
     ]),
-    '<p>Итоговая сумма со скидками появится перед оплатой. Карта и СБП открываются прямо здесь, в Telegram.</p>',
+    promo
+      ? '<p>Скидка уже учтена: карта, СБП и Stars возьмут сумму со скидкой.</p>'
+      : '<p>Итоговая сумма со скидками появится перед оплатой. Карта и СБП открываются прямо здесь, в Telegram.</p>',
   ]
   if (yookassaAvailable) parts.push(row(`<tg-button type="web_app" style="success" url="${escape(checkoutUrl.toString())}">💳 Оплатить картой или СБП</tg-button>`))
   if (input.overview?.starsEnabled && input.overview.starsRateKopecks) {
-    parts.push(row(cb('⭐ Оплатить в Stars', `buy:${plan.id}`)))
+    parts.push(row(cb(promo && discounted != null ? `⭐ Оплатить в Stars · ${formatPrice(discounted)}` : '⭐ Оплатить в Stars',
+      promo ? `buyp:${plan.id}:${promo.code}` : `buy:${plan.id}`)))
   }
   if (!yookassaAvailable && !input.overview?.starsEnabled) parts.push('<p>Оплата сейчас недоступна.</p>')
   parts.push('<hr><p>Бот и кабинет используют один аккаунт: оплата из любого места продлит ту же подписку.</p>', row(cb('💎 К тарифам', 'plans')))

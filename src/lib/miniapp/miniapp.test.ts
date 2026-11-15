@@ -157,9 +157,20 @@ describe('Telegram Mini App boundaries', () => {
     const promo = buildRichScreen({ screen: 'bonus', overview: miniAppDemo, appUrl,
       bonus: { enabled: true, attempts: 0 }, promoCodes: [{ code: 'SALE10', discountPercent: 10, expiresAt: null }] })
     expect(promo).toContain('SALE10')
-    expect(promo).toContain('type="copy_text"')
+    // Промокод применяется нажатием: открываются тарифы уже со скидкой.
+    expect(promo).toContain('avp:promo:SALE10')
+    expect(promo).not.toContain('type="copy_text"')
     const plans = buildRichScreen({ screen: 'plans', overview: miniAppDemo, appUrl })
     expect(plans).not.toContain('type="web_app"')
+    const promoPlans = buildRichScreen({ screen: 'plans', overview: miniAppDemo, appUrl,
+      activePromo: { code: 'SALE10', discountPercent: 10 } })
+    expect(promoPlans).toContain('Промокод <b>SALE10</b> применён')
+    expect(promoPlans).toContain('avp:payp:')
+    expect(promoPlans).toContain('avp:plans')
+    const paymentPromo = buildRichPaymentScreen({ screen: 'plans', overview: miniAppDemo, appUrl,
+      activePromo: { code: 'SALE10', discountPercent: 10 } }, 'demo', true, { code: 'SALE10', discountPercent: 10 })
+    expect(paymentPromo).toContain('promo=SALE10')
+    expect(paymentPromo).toContain('avp:buyp:demo:SALE10')
   })
   it('gives admins a native ticket queue in the bot', () => {
     const appUrl = 'https://cabinet.example.test/miniapp'

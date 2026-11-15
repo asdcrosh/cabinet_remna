@@ -1,4 +1,5 @@
 import { miniAppBotCall } from './bot-api'
+import { prisma } from '@/lib/prisma'
 
 // Экраны бота самодостаточны: все действия выполняются кнопками внутри
 // rich-сообщения, поэтому принудительная кнопка «Открыть приложение» не нужна.
@@ -8,13 +9,44 @@ import { miniAppBotCall } from './bot-api'
 export async function displayCallbackScreen(chatId: number, messageId: number, html: string, _appUrl?: string): Promise<number | null> {
   try {
     await miniAppBotCall('editMessageText', { chat_id: chatId, message_id: messageId, rich_message: { html } })
+    await rememberBotScreenAnchor(chatId, messageId)
     return messageId
   } catch (error) {
     // Правка без изменений — не ошибка: экран уже показывает нужное.
-    if (error instanceof Error && /not modified/i.test(error.message)) return messageId
+    if (error instanceof Error && /not modified/i.test(error.message)) {
+      await rememberBotScreenAnchor(chatId, messageId)
+      return messageId
+    }
     // Telegram cannot edit a rich message sent with ReplyKeyboardRemove.
     // The new card has no reply keyboard, so subsequent navigation can edit it.
     const sent = await miniAppBotCall<{ message_id?: number }>('sendRichMessage', { chat_id: chatId, rich_message: { html }, protect_content: true })
-    return typeof sent?.message_id === 'number' ? sent.message_id : null
+    const used = typeof sent?.message_id === 'number' ? sent.message_id : null
+    if (used) await rememberBotScreenAnchor(chatId, used)
+    return used
   }
+}
+
+// Единое окно бота: запоминаем последнее экранное сообщение пользователя,
+// чтобы навигация текстовыми кнопками и командами правила его на месте.
+async function rememberBotScreenAnchor(chatId: number, messageId: number) {
+  await prisma.user.updateMany({ where: { telegramId: BigInt(chatId) }, data: { botScreenMessageId: messageId } }).catch(() => {})
+}
+
+// Показ экрана в ответ на текст пользователя (меню, команды): правим
+// запомненное окно, а если его ещё нет — отправляем и запоминаем.
+export async function showBotScreen(chatId: number, html: string): Promise<number | null> {
+  const anchor = await prisma.user.findFirst({
+    where: { telegramId: BigInt(chatId), botScreenMessageId: { not: null } },
+    select: { botScreenMessageId: true },
+  }).catch(() => null)
+  if (anchor?.botScreenMessageId) {
+    const used = await displayCallbackScreen(chatId, anchor.botScreenMessageId, html)
+    if (used) return used
+  }
+  const sent = await miniAppBotCall<{ message_id?: number }>('sendRichMessage', {
+    chat_id: chatId, rich_message: { html }, protect_content: true, reply_markup: { remove_keyboard: true },
+  }).catch(() => null)
+  const used = sent && typeof sent.message_id === 'number' ? sent.message_id : null
+  if (used) await rememberBotScreenAnchor(chatId, used)
+  return used
 }

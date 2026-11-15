@@ -3,7 +3,7 @@ import { downloadTelegramFile, miniAppBotCall } from './bot-api'
 import { miniAppUrl } from './config'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
-import { getBotAdminThreadScreen, getBotAdminTicketsScreen, getBotBroadcastThemesScreen, getBotPaymentScreen, getBotScreen, getBotScreenInput, getBotSupportThreadScreen } from './bot-screens'
+import { getBotAdminThreadScreen, getBotAdminTicketsScreen, getBotBroadcastThemesScreen, getBotPaymentScreen, getBotPlansPromoScreen, getBotScreen, getBotScreenInput, getBotSupportThreadScreen, validateBotPromoCode } from './bot-screens'
 import { botScreens, buildAdminAssignScreen, buildAdminTemplatesScreen, buildAutoRenewalOffConfirm, buildBroadcastPreviewScreen, buildBroadcastPromptScreen, buildBroadcastSentScreen, buildDeviceDeleteConfirm, buildDeviceScreen, buildSpinResultScreen, buildSupportCategoryScreen, buildSupportPromptScreen, buildWhatsNewScreen, type BotScreen } from './rich-screens'
 import { broadcastThemeView, createBotBroadcast, findBroadcastTheme, parseBroadcastDraft, serializeBroadcastDraft, validateBroadcastText } from './broadcast-bot'
 import { claimChannelReward } from './channel-referrals'
@@ -15,7 +15,7 @@ import { createPaymentForUser } from '@/lib/payment-checkout'
 import { withDistributedLock } from '@/lib/distributed-lock'
 import { rateLimitKey } from '@/lib/rate-limit'
 import { answerStarsPreCheckout, isOurStarsPayload, refundStarsPayment, settleStarsPayment } from './stars-payments'
-import { displayCallbackScreen } from './callback-screen'
+import { displayCallbackScreen, showBotScreen } from './callback-screen'
 import { clearBotDialogState, getBotDialogStateByTelegram, setBotDialogState } from './bot-dialog'
 import { addTicketNoteAsAdmin, assignTicketAsAdmin, closeTicketAsAdmin, closeTicketFromBot, createTicketFromBot, isSupportCategory, rateTicketFromBot, replyToTicketAsAdmin, replyToTicketFromBot } from './support-bot'
 import { supportReplyTemplates } from './support-templates'
@@ -150,12 +150,45 @@ export async function handleMiniAppUpdate(update: z.infer<typeof telegramUpdateS
     // Expired callback acknowledgements must not prevent the screen from opening.
     await miniAppBotCall('answerCallbackQuery', { callback_query_id: callback.id }).catch(() => {})
     const action = callback.data.slice(4)
+    if (action.startsWith('buyp:')) {
+      // Оплата Stars с промокодом: payp:<planId>:<code>
+      const rest = action.slice(5)
+      const sep = rest.lastIndexOf(':')
+      const planId = sep > 0 ? rest.slice(0, sep) : rest
+      const code = sep > 0 ? rest.slice(sep + 1) : ''
+      const promo = code ? await validateBotPromoCode(callback.from.id, code) : null
+      if (!promo) {
+        const html = await getBotScreen(callback.from.id, 'plans', 'Промокод недоступен — возможно, он уже использован или истёк')
+        await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
+        return
+      }
+      await sendStarsInvoiceFromBot(callback.from.id, callback.id, planId, promo.code)
+      return
+    }
     if (action.startsWith('buy:')) {
       await sendStarsInvoiceFromBot(callback.from.id, callback.id, action.slice(4))
       return
     }
+    if (action.startsWith('payp:')) {
+      // Экран оплаты с применённым промокодом: payp:<planId>:<code>
+      const rest = action.slice(5)
+      const sep = rest.lastIndexOf(':')
+      const planId = sep > 0 ? rest.slice(0, sep) : rest
+      const code = sep > 0 ? rest.slice(sep + 1) : ''
+      const promo = code ? await validateBotPromoCode(callback.from.id, code) : null
+      const html = promo
+        ? await getBotPaymentScreen(callback.from.id, planId, promo)
+        : await getBotScreen(callback.from.id, 'plans', 'Промокод недоступен — возможно, он уже использован или истёк')
+      await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
+      return
+    }
     if (action.startsWith('pay:')) {
       const html = await getBotPaymentScreen(callback.from.id, action.slice(4))
+      await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
+      return
+    }
+    if (action.startsWith('promo:')) {
+      const html = await getBotPlansPromoScreen(callback.from.id, action.slice(6))
       await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
       return
     }
@@ -627,8 +660,9 @@ export async function handleMiniAppUpdate(update: z.infer<typeof telegramUpdateS
     await prisma.telegramBotDialog.deleteMany({ where: { user: { telegramId: BigInt(message.from.id) } } })
   }
   if (menuScreen && process.env.TELEGRAM_RICH_MESSAGES_ENABLED === 'true') {
-    await miniAppBotCall('sendRichMessage', { chat_id: message.chat.id, rich_message: { html: await getBotScreen(message.from.id, menuScreen) },
-      protect_content: true, reply_markup: { remove_keyboard: true } })
+    // Единое окно: текст кнопки меню убираем, экран обновляется на месте.
+    await miniAppBotCall('deleteMessage', { chat_id: message.chat.id, message_id: message.message_id }).catch(() => {})
+    await showBotScreen(message.chat.id, await getBotScreen(message.from.id, menuScreen))
     return
   }
   const command = message.text?.split(/\s+/)[0]?.split('@')[0]
@@ -648,9 +682,8 @@ export async function handleMiniAppUpdate(update: z.infer<typeof telegramUpdateS
     const account = await prisma.user.findUnique({ where: { telegramId: BigInt(message.from.id) }, select: { id: true, role: true } })
     if (account && account.role !== 'USER') {
       const html = await getBotAdminThreadScreen(message.from.id, adminThreadTicketId)
-      const sent = await miniAppBotCall<{ message_id?: number }>('sendRichMessage', { chat_id: message.chat.id,
-        rich_message: { html }, protect_content: true, reply_markup: { remove_keyboard: true } }).catch(() => null)
-      const used = sent && typeof sent.message_id === 'number' ? sent.message_id : null
+      await miniAppBotCall('deleteMessage', { chat_id: message.chat.id, message_id: message.message_id }).catch(() => {})
+      const used = await showBotScreen(message.chat.id, html)
       if (used) {
         // Как при открытии из очереди: якорь окна и живой режим ответа.
         await prisma.$transaction([
@@ -672,9 +705,9 @@ export async function handleMiniAppUpdate(update: z.infer<typeof telegramUpdateS
     const html = command === '/start' && startPayload === 'update'
       ? buildWhatsNewScreen(await getBotScreenInput(message.from.id, 'home'))
       : await getBotScreen(message.from.id, section as BotScreen, undefined, referral)
-    await miniAppBotCall('sendRichMessage', { chat_id: message.chat.id,
-      rich_message: { html },
-      protect_content: true, reply_markup: { remove_keyboard: true } })
+    // Команда убирается, экран открывается в едином окне бота.
+    await miniAppBotCall('deleteMessage', { chat_id: message.chat.id, message_id: message.message_id }).catch(() => {})
+    await showBotScreen(message.chat.id, html)
     return
   }
   if (process.env.TELEGRAM_WIDGETS_ENABLED === 'true' && command === '/start') {
@@ -852,7 +885,7 @@ async function handleBotDialogMessage(chatId: number, userId: string, state: str
     }
     return
   }
-  await miniAppBotCall('sendRichMessage', { chat_id: chatId, rich_message: { html }, protect_content: true })
+  await showBotScreen(chatId, html)
 }
 
 function callbackUuid(salt: string, callbackId: string) {
@@ -860,7 +893,7 @@ function callbackUuid(salt: string, callbackId: string) {
   return `${hash.slice(0, 8)}-${hash.slice(8, 12)}-5${hash.slice(13, 16)}-a${hash.slice(17, 20)}-${hash.slice(20, 32)}`
 }
 
-async function sendStarsInvoiceFromBot(telegramId: number, callbackId: string, planId: string) {
+async function sendStarsInvoiceFromBot(telegramId: number, callbackId: string, planId: string, promoCode?: string) {
   if (!starsEnabled()) {
     await miniAppBotCall('sendMessage', { chat_id: telegramId, text: 'Оплата Stars временно недоступна.' })
     return
@@ -879,6 +912,7 @@ async function sendStarsInvoiceFromBot(telegramId: number, callbackId: string, p
   const request = new Request(miniAppUrl(), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
     planId, purchaseType: 'SUBSCRIPTION', provider: 'TELEGRAM_STARS', deviceLimit: plan.initialDeviceLimit,
     idempotencyKey: checkoutUuid(callbackId),
+    ...(promoCode ? { promoCode } : {}),
   }) })
   const limitKey = `bot-stars:${createHash('sha256').update(String(telegramId)).digest('hex')}`
   const limited = await rateLimitKey(limitKey, 10, 60_000)
