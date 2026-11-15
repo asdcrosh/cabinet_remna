@@ -12,6 +12,7 @@ import {
 import { createAdminNotification } from '@/lib/admin-notifications'
 import { isFeatureEnabled } from '@/lib/feature-flags'
 import { buildAdminSupportTelegramText } from '@/lib/admin-telegram-notifications'
+import { syncSupportThreadViews } from '@/lib/miniapp/support-sync'
 import {
   readSupportMutationRequest,
   SupportAttachmentError,
@@ -207,6 +208,9 @@ export const POST = withAuth(async (req: Request, { params }: { params: Promise<
       : {}),
   })
 
+  // Открытое окно переписки у администратора в боте обновляется на месте.
+  await syncSupportThreadViews(ticket.id, { admin: true, adminNotice: '💬 Новое сообщение от пользователя.' })
+
   return jsonResponse({ message: serializeSupportMessage(message) }, { status: 201 })
 })
 
@@ -238,6 +242,8 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: Promise
   if (ticket.count === 0) {
     return jsonResponse({ error: 'Обращение не найдено.' }, { status: 404 })
   }
+
+  await syncSupportThreadViews(id, { user: true, admin: true, adminNotice: '✅ Пользователь закрыл обращение.' })
 
   return jsonResponse({ ok: true })
 })

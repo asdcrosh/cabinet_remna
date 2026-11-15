@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { requireStaff, withAuth } from '@/lib/auth/guard'
 import { notifySupportReply } from '@/lib/notifications'
 import { writeAuditLog } from '@/lib/audit-log'
+import { syncSupportThreadViews } from '@/lib/miniapp/support-sync'
 import {
   createSupportMessageSchema,
   serializeSupportInternalNote,
@@ -243,6 +244,9 @@ export const POST = withAuth(async (req: Request, { params }: { params: Promise<
   }
 
   await notifySupportReply({ ticketId: ticket.id, messageId: message.id })
+  // Окно треда в боте обновляется у всех сторон: пользователь — через
+  // notifySupportReply, здесь — открытое окно администратора.
+  await syncSupportThreadViews(ticket.id, { admin: true })
   await writeAuditLog({
     actorId: session.uid,
     targetId: ticket.userId,
@@ -350,6 +354,9 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: Promise
       ? parsed.data.assigneeId ? 'назначен исполнитель' : 'исполнитель снят'
       : '',
   ].filter(Boolean)
+  if (parsed.data.status && parsed.data.status !== before.status) {
+    await syncSupportThreadViews(ticket.id, { user: true, admin: true })
+  }
   await writeAuditLog({
     actorId: session.uid,
     targetId: before.userId,

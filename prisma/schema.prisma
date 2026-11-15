@@ -1646,6 +1646,10 @@ model SupportTicket {
   closedAt         DateTime?
   createdAt        DateTime            @default(now())
   updatedAt        DateTime            @updatedAt
+  /// Якоря окна переписки в боте: какое сообщение редактировать при обновлении треда
+  userBotMessageId  Int?
+  adminBotChatId    BigInt?
+  adminBotMessageId Int?
 
   user          User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
   assignee      User?                 @relation("SupportTicketAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)

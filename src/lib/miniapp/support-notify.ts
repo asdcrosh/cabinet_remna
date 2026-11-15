@@ -1,11 +1,16 @@
 import { escapeTelegramHtml as escape } from '@/lib/telegram-format'
 import { miniAppBotCall } from './bot-api'
 import { miniAppEnabled } from './config'
+import { refreshUserThreadView } from './support-sync'
 
 // Ответ поддержки приходит в бот сразу с текстом: пользователю не нужно
 // открывать кабинет — ответить можно одной кнопкой прямо в чате.
+// Если тред уже открыт в боте, он обновляется на месте — без нового сообщения.
 export async function sendSupportReplyBotMessage(telegramId: number, input: { ticketId: string; subject: string; excerpt: string }) {
   if (!miniAppEnabled()) return false
+  try {
+    if (await refreshUserThreadView(input.ticketId)) return true
+  } catch { /* Если окно не обновилось, отправляем карточку как раньше. */ }
   const html = [
     '<h3>🛟 Ответ поддержки</h3>',
     `<h4>${escape(input.subject)}</h4>`,

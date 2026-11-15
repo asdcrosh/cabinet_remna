@@ -10,7 +10,10 @@ export async function miniAppBotCall<T>(method: string, body: Record<string, unk
     signal: AbortSignal.timeout(7000),
     cache: 'no-store',
   }).catch(() => { throw new Error('Telegram is temporarily unavailable') })
-  const data = await response.json().catch(() => null) as { ok?: boolean; result?: T } | null
-  if (!response.ok || !data?.ok || data.result === undefined) throw new Error(`Telegram ${method} failed`)
+  const data = await response.json().catch(() => null) as { ok?: boolean; result?: T; description?: string } | null
+  if (!response.ok || !data?.ok || data.result === undefined) {
+    const details = typeof data?.description === 'string' && data.description.length <= 200 ? `: ${data.description}` : ''
+    throw new Error(`Telegram ${method} failed${details}`)
+  }
   return data.result
 }
