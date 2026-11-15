@@ -3,8 +3,9 @@ import { miniAppBotCall } from './bot-api'
 import { miniAppUrl } from './config'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
-import { getBotAdminThreadScreen, getBotAdminTicketsScreen, getBotPaymentScreen, getBotScreen, getBotScreenInput, getBotSupportThreadScreen } from './bot-screens'
-import { botScreens, buildAutoRenewalOffConfirm, buildDeviceDeleteConfirm, buildDeviceScreen, buildSpinResultScreen, buildSupportCategoryScreen, buildSupportPromptScreen, type BotScreen } from './rich-screens'
+import { getBotAdminThreadScreen, getBotAdminTicketsScreen, getBotBroadcastThemesScreen, getBotPaymentScreen, getBotScreen, getBotScreenInput, getBotSupportThreadScreen } from './bot-screens'
+import { botScreens, buildAutoRenewalOffConfirm, buildBroadcastPreviewScreen, buildBroadcastPromptScreen, buildBroadcastSentScreen, buildDeviceDeleteConfirm, buildDeviceScreen, buildSpinResultScreen, buildSupportCategoryScreen, buildSupportPromptScreen, type BotScreen } from './rich-screens'
+import { broadcastThemeView, createBotBroadcast, findBroadcastTheme, validateBroadcastText } from './broadcast-bot'
 import { claimChannelReward } from './channel-referrals'
 import { unbindUserDevice } from '@/lib/device-unbind'
 import { BonusBoxError, openBonusBox } from '@/lib/bonus-box'
@@ -277,6 +278,72 @@ export async function handleMiniAppUpdate(update: z.infer<typeof telegramUpdateS
       await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
       return
     }
+    if (action === 'bc:new') {
+      const html = await getBotBroadcastThemesScreen(callback.from.id)
+      await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
+      return
+    }
+    if (action.startsWith('bct:')) {
+      const theme = findBroadcastTheme(action.slice(4))
+      const account = await prisma.user.findUnique({ where: { telegramId: BigInt(callback.from.id) }, select: { id: true, role: true } })
+      if (account && account.role !== 'USER' && theme) {
+        await setBotDialogState(account.id, `broadcast:text:${theme.key}`)
+        const html = buildBroadcastPromptScreen(await getBotScreenInput(callback.from.id, 'admin'), broadcastThemeView(theme))
+        await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
+        return
+      }
+      const html = await getBotBroadcastThemesScreen(callback.from.id, theme ? 'Раздел доступен администраторам.' : 'Тема не найдена. Выберите другую.')
+      await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
+      return
+    }
+    if (action === 'bc:edit') {
+      const account = await prisma.user.findUnique({ where: { telegramId: BigInt(callback.from.id) },
+        select: { id: true, role: true, botDialog: { select: { state: true } } } })
+      const state = account?.botDialog?.state ?? ''
+      const theme = state.startsWith('broadcast:preview:') ? findBroadcastTheme(state.slice('broadcast:preview:'.length)) : null
+      if (account && account.role !== 'USER' && theme) {
+        await setBotDialogState(account.id, `broadcast:text:${theme.key}`)
+        const html = buildBroadcastPromptScreen(await getBotScreenInput(callback.from.id, 'admin', 'Отправьте новый текст рассылки.'), broadcastThemeView(theme))
+        await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
+        return
+      }
+      const html = await getBotBroadcastThemesScreen(callback.from.id, 'Черновик не найден. Начните заново.')
+      await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
+      return
+    }
+    if (action === 'bc:send') {
+      const account = await prisma.user.findUnique({ where: { telegramId: BigInt(callback.from.id) },
+        select: { id: true, role: true, botDialog: { select: { state: true, payload: true } } } })
+      const state = account?.botDialog?.state ?? ''
+      const theme = state.startsWith('broadcast:preview:') ? findBroadcastTheme(state.slice('broadcast:preview:'.length)) : null
+      const draft = account?.botDialog?.payload ?? null
+      if (!account || account.role === 'USER' || !theme || !draft) {
+        const html = await getBotBroadcastThemesScreen(callback.from.id, 'Черновик рассылки не найден. Соберите её заново.')
+        await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
+        return
+      }
+      // Черновик забираем атомарно: повторное нажатие не создаст вторую кампанию.
+      const claimed = await prisma.telegramBotDialog.deleteMany({ where: { userId: account.id, state } })
+      if (claimed.count !== 1) {
+        const html = await getBotScreen(callback.from.id, 'admin', 'Эта рассылка уже отправлена в очередь.')
+        await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
+        return
+      }
+      const result = await createBotBroadcast(account.id, theme.key, draft)
+      const html = result.ok
+        ? buildBroadcastSentScreen(await getBotScreenInput(callback.from.id, 'admin'),
+          { themeLabel: result.theme.label, recipients: result.recipients, limited: result.limited })
+        : await getBotBroadcastThemesScreen(callback.from.id, result.error)
+      await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
+      return
+    }
+    if (action === 'bc:cancel') {
+      const account = await prisma.user.findUnique({ where: { telegramId: BigInt(callback.from.id) }, select: { id: true } })
+      if (account) await clearBotDialogState(account.id)
+      const html = await getBotScreen(callback.from.id, 'admin', 'Рассылка отменена.')
+      await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
+      return
+    }
     if (action === 'admt') {
       const html = await getBotAdminTicketsScreen(callback.from.id)
       await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
@@ -338,9 +405,9 @@ export async function handleMiniAppUpdate(update: z.infer<typeof telegramUpdateS
   // Кнопки меню и команды отменяют ожидаемый ввод, свободный текст уходит в него.
   if (text && !isNavigation) {
     const account = await prisma.user.findUnique({ where: { telegramId: BigInt(message.from.id) },
-      select: { id: true, botDialog: { select: { state: true } } } })
+      select: { id: true, botDialog: { select: { state: true, payload: true } } } })
     if (account?.botDialog) {
-      await handleBotDialogMessage(message.chat.id, account.id, account.botDialog.state, text)
+      await handleBotDialogMessage(message.chat.id, account.id, account.botDialog.state, text, account.botDialog.payload)
       return
     }
   } else if (isNavigation) {
@@ -385,9 +452,30 @@ function checkoutUuid(callbackId: string) {
 // Свободный текст в ожидаемом диалоге: новое обращение, ответ в тикет
 // или ответ администратора. Состояние сохраняется при ошибках валидации,
 // чтобы текст можно было исправить и отправить повторно.
-async function handleBotDialogMessage(chatId: number, userId: string, state: string, text: string) {
+async function handleBotDialogMessage(chatId: number, userId: string, state: string, text: string, payload?: string | null) {
   let html: string
-  if (state.startsWith('support:new:')) {
+  if (state.startsWith('broadcast:text:') || state.startsWith('broadcast:preview:')) {
+    const prefix = state.startsWith('broadcast:text:') ? 'broadcast:text:' : 'broadcast:preview:'
+    const theme = findBroadcastTheme(state.slice(prefix.length))
+    if (!theme) {
+      await clearBotDialogState(userId)
+      html = await getBotScreen(chatId, 'admin', 'Тема рассылки устарела. Начните заново.')
+    } else {
+      const validated = validateBroadcastText(text)
+      if (validated.ok) {
+        await setBotDialogState(userId, `broadcast:preview:${theme.key}`, validated.body)
+        html = buildBroadcastPreviewScreen(await getBotScreenInput(chatId, 'admin'),
+          { themeLabel: theme.label, segmentLabel: theme.segmentLabel, buttonLabel: theme.button?.label ?? null, text: validated.body })
+      } else if (prefix === 'broadcast:preview:' && payload) {
+        // На шаге превью невалидный текст не затирает старый черновик.
+        html = buildBroadcastPreviewScreen(await getBotScreenInput(chatId, 'admin', `${validated.error} Черновик не изменился.`),
+          { themeLabel: theme.label, segmentLabel: theme.segmentLabel, buttonLabel: theme.button?.label ?? null, text: payload })
+      } else {
+        // Состояние сохраняется: текст можно исправить и отправить повторно.
+        html = buildBroadcastPromptScreen(await getBotScreenInput(chatId, 'admin', validated.error), broadcastThemeView(theme))
+      }
+    }
+  } else if (state.startsWith('support:new:')) {
     const category = state.slice('support:new:'.length)
     let notice: string
     if (!isSupportCategory(category)) {

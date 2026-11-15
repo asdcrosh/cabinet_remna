@@ -16,6 +16,7 @@ export interface BroadcastDeliveryPayload {
   telegramActionUrl?: string | null
   telegramActionLabel?: string | null
   telegramActionOpenInTelegram?: boolean
+  telegramBotButton?: { label: string; data: string } | null
   emailSubject?: string | null
   emailText?: string | null
   emailHtml?: string | null
@@ -82,6 +83,7 @@ export async function processBroadcastDeliveryBatch(options: {
         telegramActionUrl: payload.telegramActionUrl ?? undefined,
         telegramActionLabel: payload.telegramActionLabel ?? undefined,
         telegramActionOpenInTelegram: payload.telegramActionOpenInTelegram,
+        telegramBotButton: payload.telegramBotButton ?? undefined,
         emailSubject: payload.emailSubject ?? undefined,
         emailText: payload.emailText ?? undefined,
         emailHtml: payload.emailHtml ?? undefined,
@@ -220,6 +222,7 @@ function parsePayload(value: Prisma.JsonValue): BroadcastDeliveryPayload {
     telegramActionUrl: nullableString(payload.telegramActionUrl),
     telegramActionLabel: nullableString(payload.telegramActionLabel),
     telegramActionOpenInTelegram: payload.telegramActionOpenInTelegram === true,
+    telegramBotButton: parseBotButton(payload.telegramBotButton),
     emailSubject: nullableString(payload.emailSubject),
     emailText: nullableString(payload.emailText),
     emailHtml: nullableString(payload.emailHtml),
@@ -228,6 +231,15 @@ function parsePayload(value: Prisma.JsonValue): BroadcastDeliveryPayload {
 
 function nullableString(value: unknown) {
   return typeof value === 'string' && value.length > 0 ? value : null
+}
+
+// Кнопка ведёт только в разделы бота: чужие callback-действия из payload отсекаем.
+function parseBotButton(value: unknown): { label: string; data: string } | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+  const button = value as Record<string, unknown>
+  if (typeof button.label !== 'string' || !button.label.trim()) return null
+  if (typeof button.data !== 'string' || !/^avp:[a-z0-9:_-]{1,58}$/i.test(button.data)) return null
+  return { label: button.label.slice(0, 32), data: button.data }
 }
 
 function normalizeInt(value: number, min: number, max: number) {

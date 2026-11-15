@@ -25,12 +25,14 @@ const mocks = vi.hoisted(() => {
 })
 
 const botReplyMock = vi.hoisted(() => ({ sendSupportReplyBotMessage: vi.fn(async () => false) }))
+const broadcastBotMock = vi.hoisted(() => ({ sendBroadcastBotMessage: vi.fn(async () => false) }))
 
 vi.mock('./prisma', () => ({ prisma: mocks.prisma }))
 vi.mock('./app-url', () => ({ getAppUrl: () => 'https://cabinet.example.test' }))
 vi.mock('./branding', () => ({ getBrandName: () => 'Cabinet' }))
 vi.mock('./email-template', () => ({ renderActionEmail: () => '<p>Email</p>' }))
 vi.mock('./miniapp/support-notify', () => botReplyMock)
+vi.mock('./miniapp/broadcast-notify', () => broadcastBotMock)
 
 import {
   notifySubscriptionExpiring,
@@ -124,6 +126,67 @@ describe('notifyUser', () => {
     expect(result).toEqual({ telegram: 'sent', email: 'skipped' })
     expect(mocks.prisma.notificationLog.createMany).toHaveBeenCalledTimes(1)
     expect(fetch).toHaveBeenCalledTimes(1)
+  })
+
+  it('delivers broadcast with bot button through the miniapp bot', async () => {
+    mocks.prisma.user.findUnique.mockResolvedValue({
+      id: 'user-1',
+      email: 'user@example.test',
+      emailVerifiedAt: null,
+      name: 'User',
+      telegramId: 123n,
+    })
+    mocks.prisma.notificationLog.createMany.mockResolvedValue({ count: 1 })
+    mocks.prisma.userNotification.createMany.mockResolvedValue({ count: 1 })
+    broadcastBotMock.sendBroadcastBotMessage.mockClear().mockResolvedValue(true)
+
+    const result = await notifyUser({
+      userId: 'user-1',
+      type: 'BROADCAST',
+      dedupeKey: 'broadcast-bot-1',
+      title: 'Акция',
+      body: 'Акция',
+      telegramText: 'Скидка 20% до конца недели',
+      telegramBotButton: { label: '💎 Выбрать тариф', data: 'avp:plans' },
+    })
+
+    expect(result).toEqual({ telegram: 'sent', email: 'skipped' })
+    expect(broadcastBotMock.sendBroadcastBotMessage).toHaveBeenCalledWith(123, {
+      text: 'Скидка 20% до конца недели',
+      imageUrl: undefined,
+      button: { label: '💎 Выбрать тариф', data: 'avp:plans' },
+    })
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it('falls back to the legacy bot when the rich broadcast fails', async () => {
+    mocks.prisma.user.findUnique.mockResolvedValue({
+      id: 'user-1',
+      email: 'user@example.test',
+      emailVerifiedAt: null,
+      name: 'User',
+      telegramId: 123n,
+    })
+    mocks.prisma.notificationLog.createMany.mockResolvedValue({ count: 1 })
+    mocks.prisma.userNotification.createMany.mockResolvedValue({ count: 1 })
+    broadcastBotMock.sendBroadcastBotMessage.mockClear().mockResolvedValue(false)
+
+    const result = await notifyUser({
+      userId: 'user-1',
+      type: 'BROADCAST',
+      dedupeKey: 'broadcast-bot-2',
+      title: 'Акция',
+      body: 'Акция',
+      telegramText: 'Скидка 20% до конца недели',
+      telegramBotButton: { label: '💎 Выбрать тариф', data: 'avp:plans' },
+    })
+
+    expect(result).toEqual({ telegram: 'sent', email: 'skipped' })
+    expect(broadcastBotMock.sendBroadcastBotMessage).toHaveBeenCalled()
+    expect(fetch).toHaveBeenCalledWith(
+      'https://api.telegram.org/bottelegram-token/sendMessage',
+      expect.objectContaining({ method: 'POST' })
+    )
   })
 
   it('honors disabled user notification channels', async () => {

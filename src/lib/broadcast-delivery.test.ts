@@ -72,6 +72,24 @@ describe('processBroadcastDeliveryBatch', () => {
     )
   })
 
+  it('forwards a valid bot button and drops a tampered one', async () => {
+    const valid = makeDelivery()
+    valid.payload = { ...valid.payload, telegramBotButton: { label: '💎 Выбрать тариф', data: 'avp:plans' } } as typeof valid.payload
+    const tampered = makeDelivery()
+    tampered.id = 'delivery-2'
+    tampered.payload = { ...tampered.payload, telegramBotButton: { label: 'Вред', data: 'javascript:alert(1)' } } as typeof tampered.payload
+    mocks.prisma.broadcastDelivery.findMany.mockResolvedValue([valid, tampered])
+
+    await processBroadcastDeliveryBatch({ batchSize: 2, maxAttempts: 3 })
+
+    expect(mocks.notifyUser).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      telegramBotButton: { label: '💎 Выбрать тариф', data: 'avp:plans' },
+    }))
+    expect(mocks.notifyUser).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      telegramBotButton: undefined,
+    }))
+  })
+
   it('requeues failed deliveries until max attempts', async () => {
     const delivery = makeDelivery()
     mocks.prisma.broadcastDelivery.findMany.mockResolvedValue([delivery])

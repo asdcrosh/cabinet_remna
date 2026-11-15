@@ -3,6 +3,9 @@ import { prisma } from '@/lib/prisma'
 // Состояния диалога бота:
 //   support:new:<category>      — ждём текст нового обращения
 //   support:reply:<ticketId>    — ждём сообщение в существующий тикет
+//   admin:reply:<ticketId>      — ждём ответ администратора в тикет
+//   broadcast:text:<theme>      — ждём текст рассылки
+//   broadcast:preview:<theme>   — текст сохранён в payload, ждём подтверждение
 // Состояние одноразовое: очищается после обработки ввода, команды или кнопки меню.
 
 export async function getBotDialogState(userId: string) {
@@ -10,11 +13,11 @@ export async function getBotDialogState(userId: string) {
   return dialog?.state ?? null
 }
 
-export async function setBotDialogState(userId: string, state: string) {
+export async function setBotDialogState(userId: string, state: string, payload?: string | null) {
   await prisma.telegramBotDialog.upsert({
     where: { userId },
-    create: { userId, state },
-    update: { state },
+    create: { userId, state, payload: payload ?? null },
+    update: { state, payload: payload ?? null },
   })
 }
 

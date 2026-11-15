@@ -204,8 +204,8 @@ export function buildRichScreen(input: RichScreenInput) {
           ['💳 Оплаты сегодня', String(input.adminStats.paymentsToday)],
           ['🛟 Открытые тикеты', String(input.adminStats.openTickets)],
         ]))
-        parts.push(row(cb('🛟 Обращения пользователей', 'admt', 'success')))
-        parts.push('<p>Пользователи, платежи, тарифы и рассылки — в панели управления.</p>', row(app('🛠 Открыть панель управления', 'admin')))
+        parts.push(row(cb('🛟 Обращения пользователей', 'admt', 'success'), cb('📢 Рассылка', 'bc:new', 'success')))
+        parts.push('<p>Пользователи, платежи и тарифы — в панели управления.</p>', row(app('🛠 Открыть панель управления', 'admin')))
       }
       break
   }
@@ -310,6 +310,56 @@ export function buildAdminTicketsScreen(input: RichScreenInput, tickets: BotAdmi
     }
   }
   parts.push(row(cb('◀️ В управление', 'admin')))
+  return parts.join('')
+}
+
+export type BotBroadcastThemeView = { key: string; label: string; segmentLabel: string; buttonLabel: string | null; hint: string }
+
+// Выбор темы рассылки: кнопка действия и аудитория подставятся автоматически.
+export function buildBroadcastThemesScreen(input: RichScreenInput, themes: BotBroadcastThemeView[]) {
+  const parts = [brandHeader(input.bannerUrl), '<h3>📢 Новая рассылка</h3>']
+  if (input.notice) parts.push(`<p>💬 ${escape(input.notice)}</p>`)
+  parts.push('<p>Выберите тему — к сообщению сама добавится кнопка, которая открывает нужный раздел бота.</p>',
+    table(themes.map(theme => [theme.label, `${theme.segmentLabel}${theme.buttonLabel ? ` · кнопка «${theme.buttonLabel}»` : ''}`])))
+  for (const theme of themes) {
+    parts.push(row(cb(theme.label, `bct:${theme.key}`)))
+  }
+  parts.push(row(cb('◀️ В управление', 'admin')))
+  return parts.join('')
+}
+
+// Ожидание текста рассылки: следующее сообщение администратора — черновик.
+export function buildBroadcastPromptScreen(input: RichScreenInput, theme: BotBroadcastThemeView) {
+  const parts = [brandHeader(input.bannerUrl), `<h3>📢 ${escape(theme.label)}</h3>`]
+  if (input.notice) parts.push(`<p>💬 ${escape(input.notice)}</p>`)
+  parts.push(table([['👥 Аудитория', theme.segmentLabel], ['🔘 Кнопка в сообщении', theme.buttonLabel ?? 'Без кнопки']]),
+    `<p>${escape(theme.hint)}</p>`,
+    `<p>Отправьте текст рассылки одним сообщением (до 1200 символов). Можно использовать переменные: {name}, {plan}, {days_left}.</p>`,
+    row(cb('◀️ Отмена', 'bc:cancel')))
+  return parts.join('')
+}
+
+// Превью перед отправкой: администратор видит ровно то, что уйдёт пользователям.
+export function buildBroadcastPreviewScreen(input: RichScreenInput, draft: { themeLabel: string; segmentLabel: string; buttonLabel: string | null; text: string }) {
+  const parts = [brandHeader(input.bannerUrl), '<h3>📢 Проверьте рассылку</h3>']
+  if (input.notice) parts.push(`<p>💬 ${escape(input.notice)}</p>`)
+  parts.push(table([['Тема', draft.themeLabel], ['👥 Аудитория', draft.segmentLabel], ['🔘 Кнопка', draft.buttonLabel ?? 'Без кнопки']]),
+    '<hr><h4>Текст сообщения</h4>',
+    `<p>${escape(draft.text).replace(/\n{2,}/g, '<br><br>').replace(/\n/g, '<br>')}</p>`)
+  if (draft.buttonLabel) parts.push(`<p>Кнопка «${escape(draft.buttonLabel)}» появится под сообщением и откроет раздел в боте.</p>`)
+  parts.push(row(cb('🚀 Отправить', 'bc:send', 'success')),
+    row(cb('✍️ Изменить текст', 'bc:edit'), cb('◀️ Отмена', 'bc:cancel')))
+  return parts.join('')
+}
+
+// Рассылка поставлена в очередь.
+export function buildBroadcastSentScreen(input: RichScreenInput, stats: { themeLabel: string; recipients: number; limited: boolean }) {
+  const parts = [brandHeader(input.bannerUrl), '<h3>🚀 Рассылка в очереди</h3>',
+    table([['Тема', stats.themeLabel], ['👥 Получателей', String(stats.recipients)]])]
+  if (stats.limited) parts.push('<p>⚠️ Достигнут лимит в 5000 получателей — часть аудитории не вошла.</p>')
+  parts.push('<p>Сообщения доставляются в фоне. Статистика появится в панели управления, в разделе рассылок.</p>',
+    row(cb('📢 Новая рассылка', 'bc:new', 'success')),
+    row(cb('◀️ В управление', 'admin')))
   return parts.join('')
 }
 

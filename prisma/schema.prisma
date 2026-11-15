@@ -2047,6 +2047,7 @@ model TelegramChannelReferral {
 model TelegramBotDialog {
   userId    String   @id
   state     String
+  payload   String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

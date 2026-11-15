@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { getMiniAppOverview } from './overview'
-import { buildAdminTicketsScreen, buildRichScreen, buildRichPaymentScreen, buildSupportThreadScreen, type BotScreen, type BotThreadMessage, type RichScreenInput } from './rich-screens'
+import { buildAdminTicketsScreen, buildBroadcastThemesScreen, buildRichScreen, buildRichPaymentScreen, buildSupportThreadScreen, type BotScreen, type BotThreadMessage, type RichScreenInput } from './rich-screens'
+import { broadcastThemes, broadcastThemeView } from './broadcast-bot'
 import { miniAppUrl } from './config'
 import { channelCampaign } from './channel-referrals'
 import { ensureUserReferralCode } from '@/lib/referrals'
@@ -191,6 +192,14 @@ export async function getBotAdminTicketsScreen(telegramId: number, notice?: stri
     date: formatDate(ticket.lastMessageAt),
     fresh: ticket.adminUnreadCount > 0,
   })))
+}
+
+// Выбор темы рассылки для администратора.
+export async function getBotBroadcastThemesScreen(telegramId: number, notice?: string) {
+  const account = await prisma.user.findUnique({ where: { telegramId: BigInt(telegramId) }, select: { id: true, role: true } })
+  if (!account || account.role === 'USER') return getBotScreen(telegramId, 'home', 'Раздел доступен администраторам')
+  const input = await getBotScreenInput(telegramId, 'admin', notice)
+  return buildBroadcastThemesScreen(input, broadcastThemes.map(broadcastThemeView))
 }
 
 // Переписка обращения глазами администратора. Помечает тикет прочитанным админом.

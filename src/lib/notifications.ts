@@ -18,6 +18,7 @@ import { isWhitelistAddonPaused } from './whitelist-addon-policy'
 import { readDeviceLimitAddonSnapshot } from './device-limit-addon'
 import { sendPushToUser } from './push'
 import { sendSupportReplyBotMessage } from './miniapp/support-notify'
+import { sendBroadcastBotMessage } from './miniapp/broadcast-notify'
 
 const RENEW_PATH = '/dashboard/plans?intent=renew'
 const SUBSCRIPTION_PATH = '/dashboard/subscription'
@@ -36,6 +37,7 @@ type NotifyUserInput = {
   telegramActionUrl?: string
   telegramActionLabel?: string
   telegramActionOpenInTelegram?: boolean
+  telegramBotButton?: { label: string; data: string }
   emailSubject?: string
   emailText?: string
   emailHtml?: string
@@ -92,15 +94,26 @@ export async function notifyUser(input: NotifyUserInput) {
         channel: 'TELEGRAM',
         dedupeKey: input.dedupeKey,
         reportExistingAsSent: input.reportExistingDeliveryAsSent,
-        send: () =>
-          sendTelegramMessage({
+        send: async () => {
+          // Кампания с кнопкой в раздел бота уходит rich-сообщением; при сбое
+          // или выключенном миниапп-боте откатываемся на обычную отправку.
+          if (input.telegramBotButton) {
+            const viaBot = await sendBroadcastBotMessage(Number(user.telegramId), {
+              text: input.telegramText!,
+              imageUrl: input.telegramImageUrl,
+              button: input.telegramBotButton,
+            })
+            if (viaBot) return
+          }
+          await sendTelegramMessage({
             chatId: user.telegramId!,
             text: input.telegramText!,
             imageUrl: input.telegramImageUrl,
             actionUrl: input.telegramActionUrl,
             actionLabel: input.telegramActionLabel,
             actionOpenInTelegram: input.telegramActionOpenInTelegram,
-          }),
+          })
+        },
       })
     : 'skipped' as NotifyResult
 
