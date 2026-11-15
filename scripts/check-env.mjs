@@ -412,7 +412,7 @@ if (value("TELEGRAM_CHANNEL_REWARDS_ENABLED") === "true") {
   if (!/^(?:-100\d+|@[A-Za-z0-9_]{5,32})$/.test(value("TELEGRAM_REWARD_CHANNEL_ID"))) errors.push("TELEGRAM_REWARD_CHANNEL_ID must be a numeric ID or @username");
   if (!/^https:\/\/t\.me\/[a-zA-Z0-9_+/-]+$/.test(value("TELEGRAM_REWARD_CHANNEL_URL"))) errors.push("TELEGRAM_REWARD_CHANNEL_URL is invalid");
   if (value("TELEGRAM_REWARD_CHANNEL_ID").startsWith("@") && value("TELEGRAM_REWARD_CHANNEL_URL").toLowerCase() !== `https://t.me/${value("TELEGRAM_REWARD_CHANNEL_ID").slice(1)}`.toLowerCase()) errors.push("TELEGRAM_REWARD_CHANNEL_URL must match the channel username");
-  if (!value("TELEGRAM_REWARD_PLAN_ID")) errors.push("TELEGRAM_REWARD_PLAN_ID is required");
+  // TELEGRAM_REWARD_PLAN_ID больше не используется: бонусные дни добавляются к активной подписке участника.
   for (const [name, min, max] of [["TELEGRAM_REWARD_REFERRER_DAYS", 1, 365], ["TELEGRAM_REWARD_REFERRED_DAYS", 0, 365], ["TELEGRAM_REWARD_MAX_PER_REFERRER", 1, 1000]]) {
     const n = Number(value(name));
     if (!Number.isInteger(n) || n < min || n > max) errors.push(`${name} must be ${min}..${max}`);

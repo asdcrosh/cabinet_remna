@@ -57,7 +57,7 @@ export async function getBotScreenInput(telegramId: number, screen: BotScreen, n
         prisma.telegramChannelReferral.findUnique({ where: { referredUserId: user.id } }),
       ])
       if (campaign) input.referral = { url: `https://t.me/${process.env.TELEGRAM_MINIAPP_BOT_USERNAME || 'alekseevVP_bot'}?start=ref_${code}`,
-        condition: `Пригласите нового пользователя до его вступления в канал: вам ${campaign.referrerDays} дн. и промокод −${campaign.referrerPromoPercent}%, другу ${campaign.referredDays} дн. Бонус начисляется после вступления друга в канал. Лимит: ${campaign.cap} бонусов.`,
+        condition: `Пригласите нового пользователя до его вступления в канал: вам ${campaign.referrerDays} дн. и промокод −${campaign.referrerPromoPercent}%, другу ${campaign.referredDays} дн. Дни добавляются к активной подписке — для участия она нужна вам обоим. Лимит: ${campaign.cap} бонусов.`,
         invited, claimed, channelUrl: campaign.channelUrl, eligible: Boolean(own?.eligible), ownClaimed: Boolean(own?.claimedAt) }
     }
     if (screen === 'billing') {

@@ -16,19 +16,18 @@ export function channelCampaign() {
   if (process.env.TELEGRAM_CHANNEL_REWARDS_ENABLED !== 'true') return null
   const channelId = process.env.TELEGRAM_REWARD_CHANNEL_ID || ''
   const channelUrl = process.env.TELEGRAM_REWARD_CHANNEL_URL || ''
-  const planId = process.env.TELEGRAM_REWARD_PLAN_ID || ''
   const referrerDays = Number(process.env.TELEGRAM_REWARD_REFERRER_DAYS)
   const referredDays = Number(process.env.TELEGRAM_REWARD_REFERRED_DAYS)
   const cap = Number(process.env.TELEGRAM_REWARD_MAX_PER_REFERRER)
   // Промокод пригласившему за каждого вступившего друга (по умолчанию −30%).
   const referrerPromoPercent = Number(process.env.TELEGRAM_REWARD_REFERRER_PROMO_PERCENT || '30')
   if (!isChannelReference(channelId) || !/^https:\/\/t\.me\/[a-zA-Z0-9_+/-]+$/.test(channelUrl)
-      || (channelId.startsWith('@') && channelUrl.toLowerCase() !== `https://t.me/${channelId.slice(1)}`.toLowerCase()) || !planId
+      || (channelId.startsWith('@') && channelUrl.toLowerCase() !== `https://t.me/${channelId.slice(1)}`.toLowerCase())
       || !Number.isInteger(referrerDays) || referrerDays < 1 || referrerDays > 365
       || !Number.isInteger(referredDays) || referredDays < 0 || referredDays > 365
       || !Number.isInteger(cap) || cap < 1 || cap > 1000
       || !Number.isInteger(referrerPromoPercent) || referrerPromoPercent < 1 || referrerPromoPercent > 99) throw new Error('Channel rewards configuration is incomplete')
-  return { channelId, channelUrl, planId, referrerDays, referredDays, cap, referrerPromoPercent }
+  return { channelId, channelUrl, referrerDays, referredDays, cap, referrerPromoPercent }
 }
 
 export function isChannelMember(value: { status: string; is_member?: boolean }) {
@@ -85,8 +84,6 @@ export async function claimChannelReward(userId: string) {
     if (fresh?.claimedAt) return { claimed: true, alreadyClaimed: true }
     const used = await tx.telegramChannelReferral.count({ where: { referrerId: invitation.referrerId, claimedAt: { not: null } } })
     if (used >= campaign.cap) throw new AuthError(422, 'Лимит бонусов по этому приглашению достигнут')
-    const basePlan = await tx.plan.findUnique({ where: { id: campaign.planId } })
-    if (!basePlan?.isActive) throw new AuthError(503, 'Бонусный тариф временно недоступен')
     const referrer = await tx.user.findUnique({ where: { id: invitation.referrerId }, select: { id: true, email: true, telegramId: true } })
     if (!referrer) throw new AuthError(422, 'Аккаунт участника приглашения недоступен')
     const payments: string[] = []
@@ -94,10 +91,20 @@ export async function claimChannelReward(userId: string) {
       if (days === 0) { payments.push(''); continue }
       const recipient = await tx.user.findUnique({ where: { id: recipientId }, select: { id: true } })
       if (!recipient) throw new AuthError(422, 'Аккаунт участника приглашения недоступен')
-      const current = await tx.subscription.findFirst({ where: { userId: recipientId }, orderBy: { expireAt: 'desc' }, include: { plan: true } })
-      if (current?.plan?.unlimitedDuration || current?.status === 'PAUSED') throw new AuthError(422, 'Для этой подписки бонус оформляется через поддержку')
-      const deviceLimit = current?.deviceLimit ?? current?.plan?.deviceLimit ?? basePlan.deviceLimit
-      const plan = { ...(current?.plan ?? basePlan), durationDays: days, unlimitedDuration: false,
+      // Бонусные дни добавляются только к активной подписке участника: без неё
+      // участнику предлагаем сначала оформить тариф, бонус остаётся на месте.
+      const current = await tx.subscription.findFirst({
+        where: { userId: recipientId, status: 'ACTIVE', expireAt: { gt: new Date() } },
+        orderBy: { expireAt: 'desc' }, include: { plan: true } })
+      if (!current) {
+        throw new AuthError(422, recipientId === userId
+          ? 'Бонусные дни добавляются к активной подписке — сначала оформите тариф, затем вернитесь за бонусом'
+          : 'У пригласившего сейчас нет активной подписки — бонус станет доступен, когда подписки будут у вас обоих')
+      }
+      const currentPlan = current.plan
+      if (!currentPlan || currentPlan.unlimitedDuration) throw new AuthError(422, 'Для этой подписки бонус оформляется через поддержку')
+      const deviceLimit = current.deviceLimit ?? currentPlan.deviceLimit
+      const plan = { ...currentPlan, durationDays: days, unlimitedDuration: false,
         priceKopecks: 0, deviceLimit, maxDeviceLimit: deviceLimit, extraDevicePriceKopecks: 0 }
       const payment = await tx.payment.create({ data: {
         userId: recipientId, planId: plan.id, provider: 'LOCAL', providerStatus: 'CHANNEL_REWARD',
