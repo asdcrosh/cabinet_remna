@@ -450,28 +450,36 @@ export function buildBroadcastPromptScreen(input: RichScreenInput, theme: BotBro
     `<p>${escape(theme.hint)}</p>`,
     `<p>Отправьте текст рассылки одним сообщением (до 1200 символов). Можно использовать переменные: {name}, {plan}, {days_left}.</p>`,
     '<p>Нужна картинка — просто отправьте фото, а текст укажите в подписи к нему.</p>',
+    '<p>Своя кнопка — последней строкой: «Кнопка: Текст | plans» (раздел бота), «Кнопка: Текст | https://t.me/…» (ссылка) или «Кнопка: Текст | promo:КОД» (промокод). Она заменит кнопку темы.</p>',
+    '<p>Рассылка уйдёт пользователям в бот и продублируется постом в канал.</p>',
     row(cb('◀️ Отмена', 'bc:cancel')))
   return parts.join('')
 }
 
 // Превью перед отправкой: администратор видит ровно то, что уйдёт пользователям.
-export function buildBroadcastPreviewScreen(input: RichScreenInput, draft: { themeLabel: string; segmentLabel: string; buttonLabel: string | null; text: string; withImage?: boolean }) {
+export function buildBroadcastPreviewScreen(input: RichScreenInput, draft: { themeLabel: string; segmentLabel: string;
+  buttonLabel: string | null; buttonTarget?: string | null; text: string; withImage?: boolean }) {
   const parts = [brandHeader(input.bannerUrl), '<h3>📢 Проверьте рассылку</h3>']
   if (input.notice) parts.push(`<blockquote>💬 ${escape(input.notice)}</blockquote>`)
-  parts.push(table([['Тема', draft.themeLabel], ['👥 Аудитория', draft.segmentLabel], ['🔘 Кнопка', draft.buttonLabel ?? 'Без кнопки'], ['🖼 Картинка', draft.withImage ? 'Приложена' : 'Нет']]),
+  parts.push(table([['Тема', draft.themeLabel], ['👥 Аудитория', draft.segmentLabel], ['🔘 Кнопка', draft.buttonLabel ?? 'Без кнопки'],
+    ...(draft.buttonTarget ? [['🔗 Куда ведёт', draft.buttonTarget]] : []),
+    ['🖼 Картинка', draft.withImage ? 'Приложена' : 'Нет'], ['📣 Канал', 'Продублируется постом']]),
     '<hr><h4>Текст сообщения</h4>',
     `<p>${escape(draft.text).replace(/\n{2,}/g, '<br><br>').replace(/\n/g, '<br>')}</p>`)
-  if (draft.buttonLabel) parts.push(`<p>Кнопка «${escape(draft.buttonLabel)}» появится под сообщением и откроет раздел в боте.</p>`)
+  if (draft.buttonLabel) parts.push(`<p>Кнопка «${escape(draft.buttonLabel)}» появится под сообщением: в боте — как действие, в канале — как ссылка.</p>`)
   parts.push(row(cb('🚀 Отправить', 'bc:send', 'success')),
     row(cb('✍️ Изменить текст', 'bc:edit'), cb('◀️ Отмена', 'bc:cancel')))
   return parts.join('')
 }
 
 // Рассылка поставлена в очередь.
-export function buildBroadcastSentScreen(input: RichScreenInput, stats: { themeLabel: string; recipients: number; limited: boolean }) {
+export function buildBroadcastSentScreen(input: RichScreenInput, stats: { themeLabel: string; recipients: number;
+  limited: boolean; channelPosted?: boolean }) {
   const parts = [brandHeader(input.bannerUrl), '<h3>🚀 Рассылка в очереди</h3>',
-    table([['Тема', stats.themeLabel], ['👥 Получателей', String(stats.recipients)]])]
+    table([['Тема', stats.themeLabel], ['👥 Получателей', String(stats.recipients)],
+      ['📣 Канал', stats.channelPosted ? 'Отправлено' : 'Не отправлено']])]
   if (stats.limited) parts.push('<p>⚠️ Достигнут лимит в 5000 получателей — часть аудитории не вошла.</p>')
+  if (stats.channelPosted === false) parts.push('<p>⚠️ Пост в канал не ушёл — проверьте, что бот администратор канала с правом публикации.</p>')
   parts.push('<p>Сообщения доставляются в фоне. Статистика появится в панели управления, в разделе рассылок.</p>',
     row(cb('📢 Новая рассылка', 'bc:new', 'success')),
     row(cb('◀️ В управление', 'admin')))

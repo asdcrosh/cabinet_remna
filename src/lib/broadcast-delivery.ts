@@ -16,7 +16,7 @@ export interface BroadcastDeliveryPayload {
   telegramActionUrl?: string | null
   telegramActionLabel?: string | null
   telegramActionOpenInTelegram?: boolean
-  telegramBotButton?: { label: string; data: string } | null
+  telegramBotButton?: { label: string; data?: string; url?: string } | null
   telegramImageFileId?: string | null
   emailSubject?: string | null
   emailText?: string | null
@@ -237,12 +237,14 @@ function nullableString(value: unknown) {
 }
 
 // Кнопка ведёт только в разделы бота: чужие callback-действия из payload отсекаем.
-function parseBotButton(value: unknown): { label: string; data: string } | null {
+function parseBotButton(value: unknown): { label: string; data?: string; url?: string } | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null
   const button = value as Record<string, unknown>
   if (typeof button.label !== 'string' || !button.label.trim()) return null
-  if (typeof button.data !== 'string' || !/^avp:[a-z0-9:_-]{1,58}$/i.test(button.data)) return null
-  return { label: button.label.slice(0, 32), data: button.data }
+  const label = button.label.slice(0, 32)
+  if (typeof button.data === 'string' && /^avp:[a-z0-9:_-]{1,58}$/i.test(button.data)) return { label, data: button.data }
+  if (typeof button.url === 'string' && /^https:\/\//.test(button.url) && button.url.length <= 256) return { label, url: button.url }
+  return null
 }
 
 function normalizeInt(value: number, min: number, max: number) {

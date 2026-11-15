@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   prisma: {
     user: { findUnique: vi.fn() },
   },
+  botCall: vi.fn(async (_method: string, _payload?: Record<string, unknown>) => ({ message_id: 1 })),
   isFeatureEnabled: vi.fn(async () => true),
   rateLimitKey: vi.fn(async () => ({ ok: true, retryAfter: 0 })),
   createAdminNotification: vi.fn(async () => {}),
@@ -17,8 +18,12 @@ vi.mock('@/lib/rate-limit', () => ({ rateLimitKey: mocks.rateLimitKey }))
 vi.mock('@/lib/admin-notifications', () => ({ createAdminNotification: mocks.createAdminNotification }))
 vi.mock('@/lib/audit-log', () => ({ writeAuditLog: mocks.writeAuditLog }))
 vi.mock('@/lib/broadcast-campaign', () => ({ createBroadcastCampaign: mocks.createBroadcastCampaign }))
+vi.mock('./bot-api', () => ({ miniAppBotCall: mocks.botCall }))
+vi.mock('./channel-referrals', () => ({
+  isChannelReference: (value: string) => /^-100\d+$/.test(value) || /^@[A-Za-z0-9_]{5,32}$/.test(value),
+}))
 
-import { broadcastThemes, broadcastThemeView, createBotBroadcast, findBroadcastTheme, parseBroadcastDraft, serializeBroadcastDraft, validateBroadcastText, BROADCAST_TEXT_MAX } from './broadcast-bot'
+import { broadcastThemes, broadcastThemeView, createBotBroadcast, extractBroadcastButton, findBroadcastTheme, parseBroadcastDraft, serializeBroadcastDraft, validateBroadcastText, BROADCAST_TEXT_MAX } from './broadcast-bot'
 import { botScreens, buildBroadcastPreviewScreen, buildBroadcastPromptScreen, buildBroadcastSentScreen, buildBroadcastThemesScreen } from './rich-screens'
 
 describe('broadcast themes', () => {
@@ -52,14 +57,54 @@ describe('broadcast themes', () => {
 
   it('serializes and parses drafts with an optional photo', () => {
     const payload = serializeBroadcastDraft({ text: 'Текст рассылки', image: 'file-id-1' })
-    expect(parseBroadcastDraft(payload)).toEqual({ text: 'Текст рассылки', image: 'file-id-1' })
-    expect(parseBroadcastDraft(serializeBroadcastDraft({ text: 'Без фото', image: null }))).toEqual({ text: 'Без фото', image: null })
+    expect(parseBroadcastDraft(payload)).toEqual({ text: 'Текст рассылки', image: 'file-id-1', button: null })
+    expect(parseBroadcastDraft(serializeBroadcastDraft({ text: 'Без фото', image: null }))).toEqual({ text: 'Без фото', image: null, button: null })
     // Ранние черновики хранились простым текстом — они тоже читаются.
     expect(parseBroadcastDraft('Старый текстовый черновик')).toEqual({ text: 'Старый текстовый черновик', image: null })
     // Битый JSON читается как текстовый черновик — так хранились ранние версии.
     expect(parseBroadcastDraft('{"broken":')).toEqual({ text: '{"broken":', image: null })
     expect(parseBroadcastDraft(null)).toBeNull()
     expect(parseBroadcastDraft('   ')).toBeNull()
+  })
+
+  it('serializes and parses drafts with a custom button', () => {
+    const button = { label: 'Читать в канале', url: 'https://t.me/alekseevVP_Official', data: null }
+    const payload = serializeBroadcastDraft({ text: 'Новость', image: null, button })
+    expect(parseBroadcastDraft(payload)).toEqual({ text: 'Новость', image: null, button })
+    // Чужеродные кнопки из БД отбрасываются.
+    const tampered = JSON.stringify({ text: 'Новость', image: null, button: { label: 'Вред', data: 'javascript:alert(1)' } })
+    expect(parseBroadcastDraft(tampered)).toEqual({ text: 'Новость', image: null, button: null })
+  })
+})
+
+describe('extractBroadcastButton', () => {
+  it('keeps the text untouched without a button line', () => {
+    expect(extractBroadcastButton('Просто текст\nв две строки')).toEqual({ body: 'Просто текст\nв две строки', button: null })
+  })
+
+  it('parses an https url button', () => {
+    expect(extractBroadcastButton('Текст акции\nКнопка: Читать в канале | https://t.me/alekseevVP_Official')).toEqual({
+      body: 'Текст акции',
+      button: { label: 'Читать в канале', url: 'https://t.me/alekseevVP_Official', data: null },
+    })
+  })
+
+  it('parses a bot screen button', () => {
+    expect(extractBroadcastButton('Текст\nКнопка: Забрать бонус | bonus')).toEqual({
+      body: 'Текст', button: { label: 'Забрать бонус', url: null, data: 'avp:bonus' },
+    })
+  })
+
+  it('parses a promo button and uppercases the code', () => {
+    expect(extractBroadcastButton('Текст\nКнопка: Применить скидку | promo:sale30')).toEqual({
+      body: 'Текст', button: { label: 'Применить скидку', url: null, data: 'avp:promo:SALE30' },
+    })
+  })
+
+  it('rejects unknown targets and malformed lines with a helpful error', () => {
+    expect(extractBroadcastButton('Текст\nКнопка: Куда-то | telegram')).toHaveProperty('error')
+    expect(extractBroadcastButton('Текст\nКнопка: без разделителя')).toHaveProperty('error')
+    expect(extractBroadcastButton('Текст\nКнопка: Плохо | http://insecure.example')).toHaveProperty('error')
   })
 })
 
@@ -81,7 +126,7 @@ describe('createBotBroadcast', () => {
 
   it('queues a campaign with the theme button and segment', async () => {
     const result = await createBotBroadcast('admin-1', 'promo', 'Скидка 20% до конца недели')
-    expect(result).toEqual({ ok: true, theme: findBroadcastTheme('promo'), recipients: 42, limited: false })
+    expect(result).toEqual({ ok: true, theme: findBroadcastTheme('promo'), recipients: 42, limited: false, channelPosted: false })
     expect(mocks.createBroadcastCampaign).toHaveBeenCalledWith(expect.objectContaining({
       title: 'Акция',
       body: 'Скидка 20% до конца недели',
@@ -116,6 +161,39 @@ describe('createBotBroadcast', () => {
     mocks.rateLimitKey.mockResolvedValue({ ok: false, retryAfter: 60 })
     expect((await createBotBroadcast('admin-1', 'promo', 'Текст рассылки')).ok).toBe(false)
     expect(mocks.createBroadcastCampaign).not.toHaveBeenCalled()
+  })
+
+  it('custom button replaces the theme button in the campaign', async () => {
+    const button = { label: 'Читать в канале', url: 'https://t.me/alekseevVP_Official', data: null }
+    const result = await createBotBroadcast('admin-1', 'promo', 'Скидка 20%', null, button)
+    expect(result.ok).toBe(true)
+    expect(mocks.createBroadcastCampaign).toHaveBeenCalledWith(expect.objectContaining({
+      telegramBotButton: { label: 'Читать в канале', url: 'https://t.me/alekseevVP_Official' },
+    }))
+  })
+
+  it('duplicates the broadcast to the channel with a deeplink button', async () => {
+    process.env.TELEGRAM_BROADCAST_CHANNEL_ID = '@alekseevVP_Official'
+    process.env.TELEGRAM_MINIAPP_BOT_USERNAME = 'alekseevVP_bot'
+    const result = await createBotBroadcast('admin-1', 'promo', 'Скидка 20% до конца недели')
+    expect(result.ok && result.channelPosted).toBe(true)
+    const post = mocks.botCall.mock.calls.find(([method]) => method === 'sendRichMessage')
+    const payload = post?.[1] as { chat_id?: string; rich_message?: { html?: string } } | undefined
+    expect(payload?.chat_id).toBe('@alekseevVP_Official')
+    expect(payload?.rich_message?.html).toContain('Скидка 20% до конца недели')
+    // Кнопка темы в канале — ссылка-диаплинк на раздел бота.
+    expect(payload?.rich_message?.html).toContain('https://t.me/alekseevVP_bot?start=plans')
+    delete process.env.TELEGRAM_BROADCAST_CHANNEL_ID
+    delete process.env.TELEGRAM_MINIAPP_BOT_USERNAME
+  })
+
+  it('channel failure does not cancel the user broadcast', async () => {
+    process.env.TELEGRAM_BROADCAST_CHANNEL_ID = '@alekseevVP_Official'
+    mocks.botCall.mockRejectedValueOnce(new Error('not an admin'))
+    const result = await createBotBroadcast('admin-1', 'promo', 'Текст акции')
+    expect(result.ok).toBe(true)
+    if (result.ok) expect(result.channelPosted).toBe(false)
+    delete process.env.TELEGRAM_BROADCAST_CHANNEL_ID
   })
 })
 

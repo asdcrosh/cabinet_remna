@@ -37,7 +37,7 @@ type NotifyUserInput = {
   telegramActionUrl?: string
   telegramActionLabel?: string
   telegramActionOpenInTelegram?: boolean
-  telegramBotButton?: { label: string; data: string }
+  telegramBotButton?: { label: string; data?: string; url?: string }
   telegramImageFileId?: string
   emailSubject?: string
   emailText?: string

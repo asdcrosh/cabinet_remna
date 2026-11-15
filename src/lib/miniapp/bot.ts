@@ -5,7 +5,7 @@ import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { getBotAdminThreadScreen, getBotAdminTicketsScreen, getBotBroadcastThemesScreen, getBotPaymentScreen, getBotPlansPromoScreen, getBotScreen, getBotScreenInput, getBotSupportThreadScreen, validateBotPromoCode } from './bot-screens'
 import { botScreens, buildAdminAssignScreen, buildAdminTemplatesScreen, buildAutoRenewalOffConfirm, buildBroadcastPreviewScreen, buildBroadcastPromptScreen, buildBroadcastSentScreen, buildChannelGateScreen, buildDeviceDeleteConfirm, buildDeviceScreen, buildSpinResultScreen, buildStarsInvoiceScreen, buildSupportCategoryScreen, buildSupportPromptScreen, buildWhatsNewScreen, type BotScreen } from './rich-screens'
-import { broadcastThemeView, createBotBroadcast, findBroadcastTheme, parseBroadcastDraft, serializeBroadcastDraft, validateBroadcastText } from './broadcast-bot'
+import { broadcastThemeView, createBotBroadcast, extractBroadcastButton, findBroadcastTheme, parseBroadcastDraft, serializeBroadcastDraft, validateBroadcastText, type BroadcastDraft } from './broadcast-bot'
 import { channelGate, claimChannelReward } from './channel-referrals'
 import { unbindUserDevice } from '@/lib/device-unbind'
 import { BonusBoxError, openBonusBox } from '@/lib/bonus-box'
@@ -88,7 +88,7 @@ export function isMiniAppOwnedUpdate(value: unknown) {
   if (typeof content !== 'string') return false
   if (['Моя подписка', 'Мои устройства', 'Пригласить друга', 'Поддержка'].includes(content)) return true
   return /^\/(?:app|menu|subscription|connect|plans|billing|devices|bonus|notifications|referrals|settings|admin|support|paysupport|help)(?:@[A-Za-z0-9_]+)?(?:\s|$)/.test(content)
-    || /^\/start(?:@[A-Za-z0-9_]+)?(?:\s+(?:ref_[A-Z0-9]{6,8}|update|admt_[A-Za-z0-9]{1,40}))?$/.test(content)
+    || /^\/start(?:@[A-Za-z0-9_]+)?(?:\s+(?:ref_[A-Z0-9]{6,8}|update|admt_[A-Za-z0-9]{1,40}|home|subscription|plans|billing|devices|bonus|promos|notifications|referrals|support|connect|settings|admin))?$/.test(content)
 }
 
 // Произвольный текст принадлежит новому боту, если пользователя ждёт ввод
@@ -457,10 +457,11 @@ export async function handleMiniAppUpdate(update: z.infer<typeof telegramUpdateS
         await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
         return
       }
-      const result = await createBotBroadcast(account.id, theme.key, draft.text, draft.image)
+      const result = await createBotBroadcast(account.id, theme.key, draft.text, draft.image, draft.button)
       const html = result.ok
         ? buildBroadcastSentScreen(await getBotScreenInput(callback.from.id, 'admin'),
-          { themeLabel: result.theme.label, recipients: result.recipients, limited: result.limited })
+          { themeLabel: result.theme.label, recipients: result.recipients, limited: result.limited,
+            channelPosted: result.channelPosted })
         : await getBotBroadcastThemesScreen(callback.from.id, result.error)
       await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
       return
@@ -746,9 +747,12 @@ export async function handleMiniAppUpdate(update: z.infer<typeof telegramUpdateS
     '/referrals': 'referrals', '/settings': 'settings', '/admin': 'admin',
     '/support': 'support', '/paysupport': 'support', '/help': 'support',
   }
-  const section = menuScreen || commands[command || '']
-  if (!section) return
   const startPayload = message.text?.match(/^\/start(?:@[a-zA-Z0-9_]+)?(?:\s+(.+))?$/)?.[1]?.trim()
+  // Диаплинки из канала и рассылок: /start plans, /start bonus и т.п. открывают раздел.
+  const startScreen = command === '/start' && botScreens.includes(startPayload as BotScreen)
+    ? startPayload as BotScreen : undefined
+  const section = menuScreen || startScreen || commands[command || '']
+  if (!section) return
   const referral = startPayload?.match(/^ref_([A-Z0-9]{6,8})$/)?.[1]
   // Deep link из уведомления админу: сразу открываем тред обращения в боте.
   const adminThreadTicketId = command === '/start' ? startPayload?.match(/^admt_([A-Za-z0-9]{1,40})$/)?.[1] : undefined
@@ -840,24 +844,34 @@ async function handleBotDialogMessage(chatId: number, userId: string, state: str
       await clearBotDialogState(userId)
       html = await getBotScreen(chatId, 'admin', 'Тема рассылки устарела. Начните заново.')
     } else {
-      const validated = validateBroadcastText(text)
-      if (validated.ok) {
+      // Своя кнопка — последней строкой «Кнопка: Текст | цель», она заменяет кнопку темы.
+      const extracted = extractBroadcastButton(text)
+      const validated = 'error' in extracted ? null : validateBroadcastText(extracted.body)
+      const draftError = 'error' in extracted ? extracted.error : validated && !validated.ok ? validated.error : null
+      if (validated?.ok && !('error' in extracted)) {
         // Текст без нового фото сохраняет приложенное ранее — и наоборот.
-        const draft = { text: validated.body, image: imageFileId ?? previousDraft?.image ?? null }
+        const draft: BroadcastDraft = { text: validated.body, image: imageFileId ?? previousDraft?.image ?? null,
+          button: extracted.button ?? previousDraft?.button ?? null }
         await setBotDialogState(userId, `broadcast:preview:${theme.key}`, serializeBroadcastDraft(draft))
         consumeMessage = true
         html = buildBroadcastPreviewScreen(await getBotScreenInput(chatId, 'admin'),
-          { themeLabel: theme.label, segmentLabel: theme.segmentLabel, buttonLabel: theme.button?.label ?? null, text: draft.text, withImage: Boolean(draft.image) })
+          { themeLabel: theme.label, segmentLabel: theme.segmentLabel,
+            buttonLabel: draft.button?.label ?? theme.button?.label ?? null,
+            buttonTarget: draft.button ? draft.button.url ?? draft.button.data!.replace(/^avp:/, '') : null,
+            text: draft.text, withImage: Boolean(draft.image) })
       } else if (prefix === 'broadcast:preview:' && previousDraft) {
         // На шаге превью невалидный ввод не затирает старый черновик.
         const notice = imageFileId && !text.trim()
           ? 'У фото должна быть подпись с текстом рассылки. Черновик не изменился.'
-          : `${validated.error} Черновик не изменился.`
+          : `${draftError} Черновик не изменился.`
         html = buildBroadcastPreviewScreen(await getBotScreenInput(chatId, 'admin', notice),
-          { themeLabel: theme.label, segmentLabel: theme.segmentLabel, buttonLabel: theme.button?.label ?? null, text: previousDraft.text, withImage: Boolean(previousDraft.image) })
+          { themeLabel: theme.label, segmentLabel: theme.segmentLabel,
+            buttonLabel: previousDraft.button?.label ?? theme.button?.label ?? null,
+            buttonTarget: previousDraft.button ? previousDraft.button.url ?? previousDraft.button.data!.replace(/^avp:/, '') : null,
+            text: previousDraft.text, withImage: Boolean(previousDraft.image) })
       } else {
         // Состояние сохраняется: текст можно исправить и отправить повторно.
-        const notice = imageFileId && !text.trim() ? 'У фото должна быть подпись с текстом рассылки.' : validated.error
+        const notice = imageFileId && !text.trim() ? 'У фото должна быть подпись с текстом рассылки.' : draftError!
         html = buildBroadcastPromptScreen(await getBotScreenInput(chatId, 'admin', notice), broadcastThemeView(theme))
       }
     }

@@ -10,9 +10,16 @@ export async function sendBroadcastBotMessage(telegramId: number, input: {
   text: string
   imageUrl?: string
   imageFileId?: string
-  button: { label: string; data: string }
+  button: { label: string; data?: string; url?: string }
 }) {
   if (!miniAppEnabled()) return false
+  // Кнопка-ссылка или действие в боте: один из двух вариантов обязателен.
+  const inlineButton = input.button.url
+    ? { text: input.button.label, url: input.button.url, style: 'success' }
+    : { text: input.button.label, callback_data: input.button.data, style: 'success' }
+  const richButton = input.button.url
+    ? `<tg-button type="url" style="success" url="${escape(input.button.url)}">${escape(input.button.label)}</tg-button>`
+    : `<tg-button type="callback_data" style="success" data="${escape(input.button.data ?? '')}">${escape(input.button.label)}</tg-button>`
   try {
     if (input.imageFileId) {
       await miniAppBotCall('sendPhoto', {
@@ -22,9 +29,7 @@ export async function sendBroadcastBotMessage(telegramId: number, input: {
         parse_mode: 'HTML',
         protect_content: true,
         reply_markup: {
-          inline_keyboard: [[
-            { text: input.button.label, callback_data: input.button.data, style: 'success' },
-          ]],
+          inline_keyboard: [[inlineButton]],
         },
       })
       return true
@@ -32,7 +37,7 @@ export async function sendBroadcastBotMessage(telegramId: number, input: {
     const html = [
       ...(input.imageUrl && /^https:\/\//.test(input.imageUrl) ? [`<img src="${escape(input.imageUrl)}">`] : []),
       `<p>${input.text.replace(/\n{2,}/g, '<br><br>').replace(/\n/g, '<br>')}</p>`,
-      `<tg-button-row><tg-button type="callback_data" style="success" data="${escape(input.button.data)}">${escape(input.button.label)}</tg-button></tg-button-row>`,
+      `<tg-button-row>${richButton}</tg-button-row>`,
     ].join('')
     await miniAppBotCall('sendRichMessage', { chat_id: telegramId, rich_message: { html }, protect_content: true })
     return true

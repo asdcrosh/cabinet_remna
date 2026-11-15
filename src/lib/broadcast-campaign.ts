@@ -18,7 +18,8 @@ export const ACTIVE_SUBSCRIPTION_STATUSES = ['ACTIVE', 'LIMITED'] satisfies Subs
 
 export type BroadcastSegment = 'ALL' | 'ACTIVE' | 'NO_ACTIVE' | 'EXPIRED' | 'NEVER_PURCHASED' | 'INACTIVE_N_DAYS'
 export type BroadcastChannel = 'IN_APP' | 'EMAIL' | 'TELEGRAM'
-export type BroadcastBotButton = { label: string; data: string }
+// Кнопка под сообщением в боте: действие (callback_data) или внешняя ссылка.
+export type BroadcastBotButton = { label: string; data?: string; url?: string }
 
 export const broadcastUserSelect = {
   id: true,
