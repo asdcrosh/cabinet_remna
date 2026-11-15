@@ -2,8 +2,8 @@ import { escapeTelegramHtml as escape } from '@/lib/telegram-format'
 import type { MiniAppOverview } from './model'
 import { formatPrice } from '@/lib/format'
 
-export type BotScreen = 'home' | 'subscription' | 'plans' | 'billing' | 'devices' | 'bonus' | 'notifications' | 'referrals' | 'support' | 'connect' | 'settings' | 'admin'
-export const botScreens: BotScreen[] = ['home', 'subscription', 'plans', 'billing', 'devices', 'bonus', 'notifications', 'referrals', 'support', 'connect', 'settings', 'admin']
+export type BotScreen = 'home' | 'subscription' | 'plans' | 'billing' | 'devices' | 'bonus' | 'promos' | 'notifications' | 'referrals' | 'support' | 'connect' | 'settings' | 'admin'
+export const botScreens: BotScreen[] = ['home', 'subscription', 'plans', 'billing', 'devices', 'bonus', 'promos', 'notifications', 'referrals', 'support', 'connect', 'settings', 'admin']
 export type BotDevice = { id: string; title: string; platform: string }
 export type BotSpinResult = { prizeTitle: string; prizeDescription: string | null; promoCode: string | null; promoCodeExpiresAt: string | null; remainingAttempts: number }
 export type BotTicket = { id: string; subject: string; status: string }
@@ -33,7 +33,7 @@ export type RichScreenInput = {
 }
 const titles: Record<BotScreen, string> = {
   home: '🏠 Главная', subscription: '📡 Моя подписка', plans: '💎 Тарифы', billing: '💳 Платежи', devices: '📱 Устройства',
-  bonus: '🎁 Бонусы', notifications: '🔔 Уведомления', referrals: '🤝 Пригласить друга', support: '🛟 Поддержка',
+  bonus: '🎁 Бонусы', promos: '🏷 Промокоды', notifications: '🔔 Уведомления', referrals: '🤝 Пригласить друга', support: '🛟 Поддержка',
   connect: '🔌 Подключение', settings: '⚙️ Настройки', admin: '🛠 Управление сервисом',
 }
 const cb = (label: string, screen: string, style = 'primary') => `<tg-button type="callback_data" style="${style}" data="avp:${escape(screen)}">${escape(label)}</tg-button>`
@@ -59,7 +59,7 @@ export function buildRichScreen(input: RichScreenInput) {
     return `<tg-button type="web_app" style="success" url="${escape(url.toString())}">${escape(label)}</tg-button>`
   }
   const parts = [brandHeader(input.bannerUrl), `<h3>${titles[input.screen]}</h3>`]
-  if (input.notice) parts.push(`<p>💬 ${escape(input.notice)}</p>`)
+  if (input.notice) parts.push(`<blockquote>💬 ${escape(input.notice)}</blockquote>`)
   const data = input.overview
   if (!data) {
     parts.push('<p>👋 Подписка, устройства и обращения — в одном месте.</p><p>Войдите через Telegram, чтобы открыть свой кабинет.</p>', row(app('🚀 Открыть кабинет', 'home')))
@@ -150,19 +150,41 @@ export function buildRichScreen(input: RichScreenInput) {
       }
       const attempts = input.bonus?.attempts ?? 0
       parts.push('<h4>🎡 Колесо подарков</h4>', attempts > 0
-        ? `<p>Доступно попыток: <b>${attempts}</b>. Приз начисляется сразу, не закрывая чат.</p>`
-        : '<p>Новые попытки появляются за задания, покупки и приглашения друзей.</p>')
+        ? `<p>Доступно попыток: <b>${attempts}</b></p><blockquote>Приз начисляется сразу, не закрывая чат.</blockquote>`
+        : '<blockquote>Новые попытки появляются за задания, покупки и приглашения друзей.</blockquote>')
       if (attempts > 0) parts.push(row(cb(`🎡 Крутить колесо · ${attempts}`, 'spin', 'success')))
       if (input.promoCodes?.length) {
-        parts.push('<h4>🏷 Ваши промокоды</h4>',
-          table(input.promoCodes.map(promo => [`${promo.code} · −${promo.discountPercent}%`,
+        const top = input.promoCodes.slice(0, 3)
+        parts.push('<hr><h4>🏷 Ваши промокоды</h4>',
+          table(top.map(promo => [`${promo.code} · −${promo.discountPercent}%`,
             promo.expiresAt ? `до ${new Date(promo.expiresAt).toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow' })}` : 'без срока'])),
-          '<p>Нажмите на промокод — тарифы откроются уже со скидкой, останется выбрать способ оплаты.</p>')
-        for (const promo of input.promoCodes.slice(0, 3)) {
+          '<blockquote>Нажмите на промокод — тарифы откроются уже со скидкой.</blockquote>')
+        for (const promo of top) {
           parts.push(row(cb(`🏷 Применить ${promo.code} · −${promo.discountPercent}%`, `promo:${promo.code}`, 'success')))
         }
+        parts.push(row(input.promoCodes.length > 3
+          ? cb(`📋 Все промокоды · ${input.promoCodes.length}`, 'promos')
+          : cb('📋 Все промокоды', 'promos')))
       }
       if (data.referrals) parts.push(row(cb('🤝 Пригласить друга', 'referrals')))
+      break
+    }
+    case 'promos': {
+      const promos = input.promoCodes ?? []
+      if (!promos.length) {
+        parts.push('<p>Активных промокодов пока нет.</p>',
+          '<blockquote>Промокоды появляются за колесо подарков, приветственные бонусы и объединение кодов.</blockquote>',
+          row(cb('🎁 К бонусам', 'bonus', 'success')))
+        break
+      }
+      parts.push(`<p>Активных промокодов: <b>${promos.length}</b></p>`,
+        table(promos.map(promo => [`${promo.code} · −${promo.discountPercent}%`,
+          promo.expiresAt ? `до ${new Date(promo.expiresAt).toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow' })}` : 'без срока'])),
+        '<blockquote>Нажмите на промокод — тарифы откроются уже со скидкой.</blockquote>')
+      for (const promo of promos.slice(0, 10)) {
+        parts.push(row(cb(`🏷 Применить ${promo.code} · −${promo.discountPercent}%`, `promo:${promo.code}`, 'success')))
+      }
+      parts.push(row(cb('🎁 К бонусам', 'bonus')))
       break
     }
     case 'notifications': {
@@ -285,9 +307,9 @@ export function buildSpinResultScreen(input: RichScreenInput, spin: BotSpinResul
   if (spin.prizeDescription) parts.push(`<p>${escape(spin.prizeDescription)}</p>`)
   if (spin.promoCode) {
     parts.push(table([['Промокод', spin.promoCode], ...(spin.promoCodeExpiresAt ? [['Действует до', new Date(spin.promoCodeExpiresAt).toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow' })]] as string[][] : [])]),
-      row(copyBtn('📋 Скопировать промокод', spin.promoCode)))
+      row(cb(`🏷 Применить ${spin.promoCode}`, `promo:${spin.promoCode}`, 'success'), copyBtn('📋 Скопировать', spin.promoCode)))
   }
-  parts.push(`<p>Осталось попыток: ${spin.remainingAttempts}.</p>`)
+  parts.push(`<p>Осталось попыток: <b>${spin.remainingAttempts}</b>.</p>`)
   if (spin.remainingAttempts > 0) parts.push(row(cb(`🎡 Крутить ещё · ${spin.remainingAttempts}`, 'spin', 'success')))
   parts.push(row(cb('🎁 К бонусам', 'bonus')), footer('bonus'))
   return parts.join('')
@@ -325,7 +347,7 @@ export function buildSupportThreadScreen(input: RichScreenInput, thread: { id: s
       ['Статус', thread.status],
       ...(thread.rating ? [[viewer === 'admin' ? 'Оценка пользователя' : 'Ваша оценка', thread.rating === 'up' ? '👍' : '👎']] : []),
     ])]
-  if (input.notice) parts.push(`<p>💬 ${escape(input.notice)}</p>`)
+  if (input.notice) parts.push(`<blockquote>💬 ${escape(input.notice)}</blockquote>`)
   if (!thread.messages.length) parts.push('<p>Сообщений пока нет.</p>')
   if (thread.messages.length) {
     parts.push('<h4>💬 Переписка</h4>')
@@ -392,7 +414,7 @@ export type BotAdminTicket = { id: string; subject: string; status: string; user
 // Очередь обращений для администратора — ответить можно прямо из бота.
 export function buildAdminTicketsScreen(input: RichScreenInput, tickets: BotAdminTicket[]) {
   const parts = [brandHeader(input.bannerUrl), '<h3>🛟 Обращения пользователей</h3>']
-  if (input.notice) parts.push(`<p>💬 ${escape(input.notice)}</p>`)
+  if (input.notice) parts.push(`<blockquote>💬 ${escape(input.notice)}</blockquote>`)
   if (!tickets.length) parts.push('<p>✅ Открытых обращений нет.</p>')
   if (tickets.length) {
     parts.push(table(tickets.map(ticket => [`${ticket.fresh ? '🔴 ' : ''}${ticket.userLabel}`, `${ticket.subject} · ${ticket.status}`])),
@@ -410,7 +432,7 @@ export type BotBroadcastThemeView = { key: string; label: string; segmentLabel: 
 // Выбор темы рассылки: кнопка действия и аудитория подставятся автоматически.
 export function buildBroadcastThemesScreen(input: RichScreenInput, themes: BotBroadcastThemeView[]) {
   const parts = [brandHeader(input.bannerUrl), '<h3>📢 Новая рассылка</h3>']
-  if (input.notice) parts.push(`<p>💬 ${escape(input.notice)}</p>`)
+  if (input.notice) parts.push(`<blockquote>💬 ${escape(input.notice)}</blockquote>`)
   parts.push('<p>Выберите тему — к сообщению сама добавится кнопка, которая открывает нужный раздел бота.</p>',
     table(themes.map(theme => [theme.label, `${theme.segmentLabel}${theme.buttonLabel ? ` · кнопка «${theme.buttonLabel}»` : ''}`])))
   for (const theme of themes) {
@@ -423,7 +445,7 @@ export function buildBroadcastThemesScreen(input: RichScreenInput, themes: BotBr
 // Ожидание текста рассылки: следующее сообщение администратора — черновик.
 export function buildBroadcastPromptScreen(input: RichScreenInput, theme: BotBroadcastThemeView) {
   const parts = [brandHeader(input.bannerUrl), `<h3>📢 ${escape(theme.label)}</h3>`]
-  if (input.notice) parts.push(`<p>💬 ${escape(input.notice)}</p>`)
+  if (input.notice) parts.push(`<blockquote>💬 ${escape(input.notice)}</blockquote>`)
   parts.push(table([['👥 Аудитория', theme.segmentLabel], ['🔘 Кнопка в сообщении', theme.buttonLabel ?? 'Без кнопки']]),
     `<p>${escape(theme.hint)}</p>`,
     `<p>Отправьте текст рассылки одним сообщением (до 1200 символов). Можно использовать переменные: {name}, {plan}, {days_left}.</p>`,
@@ -435,7 +457,7 @@ export function buildBroadcastPromptScreen(input: RichScreenInput, theme: BotBro
 // Превью перед отправкой: администратор видит ровно то, что уйдёт пользователям.
 export function buildBroadcastPreviewScreen(input: RichScreenInput, draft: { themeLabel: string; segmentLabel: string; buttonLabel: string | null; text: string; withImage?: boolean }) {
   const parts = [brandHeader(input.bannerUrl), '<h3>📢 Проверьте рассылку</h3>']
-  if (input.notice) parts.push(`<p>💬 ${escape(input.notice)}</p>`)
+  if (input.notice) parts.push(`<blockquote>💬 ${escape(input.notice)}</blockquote>`)
   parts.push(table([['Тема', draft.themeLabel], ['👥 Аудитория', draft.segmentLabel], ['🔘 Кнопка', draft.buttonLabel ?? 'Без кнопки'], ['🖼 Картинка', draft.withImage ? 'Приложена' : 'Нет']]),
     '<hr><h4>Текст сообщения</h4>',
     `<p>${escape(draft.text).replace(/\n{2,}/g, '<br><br>').replace(/\n/g, '<br>')}</p>`)

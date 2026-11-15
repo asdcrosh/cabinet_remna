@@ -73,7 +73,7 @@ export async function getBotScreenInput(telegramId: number, screen: BotScreen, n
         : null
       input.autoRenewalActive = autoRenewal?.status === 'ACTIVE' || autoRenewal?.status === 'PROCESSING' || autoRenewal?.status === 'RETRYING' || autoRenewal?.status === 'PAUSED'
     }
-    if (screen === 'bonus') {
+    if (screen === 'bonus' || screen === 'promos') {
       const features = await getFeatureFlags()
       const attempts = features.bonusBox
         ? await prisma.bonusBoxAttempt.count({ where: { userId: user.id, usedAt: null, OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] } })
@@ -134,7 +134,7 @@ export async function getBotPromoCodes(userId: string) {
     prisma.promoCodeRedemption.findMany({ where: { userId, promoCode: { code: { in: codes } } }, select: { promoCode: { select: { code: true } } } }),
   ])
   const used = new Set(redeemed.map(item => item.promoCode.code))
-  return active.filter(promo => !used.has(promo.code)).slice(0, 5)
+  return active.filter(promo => !used.has(promo.code)).slice(0, 20)
     .map(promo => ({ code: promo.code, discountPercent: promo.discountPercent, expiresAt: promo.expiresAt?.toISOString() ?? null }))
 }
 

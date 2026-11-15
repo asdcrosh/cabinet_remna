@@ -160,6 +160,13 @@ describe('Telegram Mini App boundaries', () => {
     // Промокод применяется нажатием: открываются тарифы уже со скидкой.
     expect(promo).toContain('avp:promo:SALE10')
     expect(promo).not.toContain('type="copy_text"')
+    // Кнопка перехода к полному списку промокодов.
+    expect(promo).toContain('avp:promos')
+    const promos = buildRichScreen({ screen: 'promos', overview: miniAppDemo, appUrl,
+      promoCodes: [{ code: 'SALE10', discountPercent: 10, expiresAt: null }, { code: 'VIP25', discountPercent: 25, expiresAt: null }] })
+    expect(promos).toContain('VIP25')
+    expect(promos).toContain('avp:promo:VIP25')
+    expect(promos).toContain('avp:bonus')
     const plans = buildRichScreen({ screen: 'plans', overview: miniAppDemo, appUrl })
     expect(plans).not.toContain('type="web_app"')
     const promoPlans = buildRichScreen({ screen: 'plans', overview: miniAppDemo, appUrl,

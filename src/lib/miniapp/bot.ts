@@ -15,7 +15,7 @@ import { createPaymentForUser } from '@/lib/payment-checkout'
 import { withDistributedLock } from '@/lib/distributed-lock'
 import { rateLimitKey } from '@/lib/rate-limit'
 import { answerStarsPreCheckout, isOurStarsPayload, refundStarsPayment, settleStarsPayment } from './stars-payments'
-import { displayCallbackScreen, showBotScreen } from './callback-screen'
+import { displayCallbackScreen, hasBotScreenAnchor, sendBotScreenLoadingDraft, showBotScreen } from './callback-screen'
 import { clearBotDialogState, getBotDialogStateByTelegram, setBotDialogState } from './bot-dialog'
 import { addTicketNoteAsAdmin, assignTicketAsAdmin, closeTicketAsAdmin, closeTicketFromBot, createTicketFromBot, isSupportCategory, rateTicketFromBot, replyToTicketAsAdmin, replyToTicketFromBot } from './support-bot'
 import { supportReplyTemplates } from './support-templates'
@@ -235,6 +235,12 @@ export async function handleMiniAppUpdate(update: z.infer<typeof telegramUpdateS
           promoCode: spin.promoCode, promoCodeExpiresAt: spin.promoCodeExpiresAt, remainingAttempts: spin.remainingAttempts })
       } catch (e) {
         html = await getBotScreen(callback.from.id, 'bonus', e instanceof BonusBoxError ? e.message : 'Розыгрыш временно недоступен')
+      }
+      // Анимация розыгрыша: два быстрых кадра в том же сообщении перед призом.
+      for (const frame of ['🎡 Крутим колесо…', '🎁 Достаём приз…']) {
+        await displayCallbackScreen(callback.from.id, callback.message.message_id,
+          `<h3>🎁 Бонусы</h3><h4>${frame}</h4>`, miniAppUrl()).catch(() => null)
+        await new Promise(resolve => setTimeout(resolve, 500))
       }
       await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
       return
@@ -662,6 +668,10 @@ export async function handleMiniAppUpdate(update: z.infer<typeof telegramUpdateS
   if (menuScreen && process.env.TELEGRAM_RICH_MESSAGES_ENABLED === 'true') {
     // Единое окно: текст кнопки меню убираем, экран обновляется на месте.
     await miniAppBotCall('deleteMessage', { chat_id: message.chat.id, message_id: message.message_id }).catch(() => {})
+    // Анимация: «печатает…», пока экран собирается. Черновик загрузки — только если
+    // окна ещё нет и экран уйдёт новым сообщением (при правке он бы завис на 30 секунд).
+    await miniAppBotCall('sendChatAction', { chat_id: message.chat.id, action: 'typing' }).catch(() => {})
+    if (!await hasBotScreenAnchor(message.chat.id)) await sendBotScreenLoadingDraft(message.chat.id)
     await showBotScreen(message.chat.id, await getBotScreen(message.from.id, menuScreen))
     return
   }
@@ -701,12 +711,15 @@ export async function handleMiniAppUpdate(update: z.infer<typeof telegramUpdateS
   }
   const content = welcomeMessage(section, referral)
   if (process.env.TELEGRAM_RICH_MESSAGES_ENABLED === 'true') {
+    // Команда убирается, экран открывается в едином окне бота. Пока он собирается —
+    // «печатает…» и, если окна ещё нет, короткий черновик-загрузка.
+    await miniAppBotCall('deleteMessage', { chat_id: message.chat.id, message_id: message.message_id }).catch(() => {})
+    await miniAppBotCall('sendChatAction', { chat_id: message.chat.id, action: 'typing' }).catch(() => {})
+    if (!await hasBotScreenAnchor(message.chat.id)) await sendBotScreenLoadingDraft(message.chat.id)
     // Переход по ссылке из анонса в канале встречаем экраном новых возможностей.
     const html = command === '/start' && startPayload === 'update'
       ? buildWhatsNewScreen(await getBotScreenInput(message.from.id, 'home'))
       : await getBotScreen(message.from.id, section as BotScreen, undefined, referral)
-    // Команда убирается, экран открывается в едином окне бота.
-    await miniAppBotCall('deleteMessage', { chat_id: message.chat.id, message_id: message.message_id }).catch(() => {})
     await showBotScreen(message.chat.id, html)
     return
   }
@@ -744,9 +757,10 @@ async function resolveBotSupportAttachment(media: BotDialogMedia | null | undefi
 }
 
 // Свободный текст в ожидаемом диалоге: новое обращение, ответ в тикет
-// или ответ администратора. Состояние сохраняется при ошибках валидации,
-// чтобы текст можно было исправить и отправить повторно. Успешно принятое
-// сообщение удаляется из чата — переписка живёт в одном обновляемом окне.
+// или ответ администратора. Состояние сохраняется при ошибках, чтобы текст
+// можно было отправить повторно. Сообщение пользователя удаляется из чата
+// всегда — и при успехе, и при ошибке: переписка живёт в одном обновляемом
+// окне, а ошибка показывается в нём временным уведомлением.
 async function handleBotDialogMessage(chatId: number, userId: string, state: string, text: string, sourceMessageId: number, payload?: string | null, media?: BotDialogMedia | null) {
   let html: string
   // Если у треда есть открытое окно — правим его на месте, новое сообщение не шлём.
@@ -792,7 +806,9 @@ async function handleBotDialogMessage(chatId: number, userId: string, state: str
     } else {
       const { attachment, error: attachmentError } = await resolveBotSupportAttachment(media)
       if (attachmentError) {
-        html = await getBotScreen(chatId, 'support', attachmentError)
+        // Не доставлено: сообщение убираем из чата, окно временно показывает причину.
+        consumeMessage = true
+        html = await getBotScreen(chatId, 'support', `⚠️ ${attachmentError} Сообщение не доставлено — отправьте его ещё раз.`)
       } else {
       const result = await createTicketFromBot(userId, category, text, attachment)
       if (result.ok && result.ticketId) {
@@ -807,9 +823,11 @@ async function handleBotDialogMessage(chatId: number, userId: string, state: str
           ? { ticketId: result.ticketId, messageId: promptMessageId, field: 'userBotMessageId' as const }
           : null
       } else if (!result.ok) {
-        html = await getBotScreen(chatId, 'support', result.error)
+        consumeMessage = true
+        html = await getBotScreen(chatId, 'support', `⚠️ ${result.error} Сообщение не доставлено — отправьте его ещё раз.`)
       } else {
-        html = await getBotScreen(chatId, 'support', 'Не удалось открыть обращение. Попробуйте ещё раз.')
+        consumeMessage = true
+        html = await getBotScreen(chatId, 'support', '⚠️ Не удалось открыть обращение. Сообщение не доставлено — отправьте его ещё раз.')
       }
       }
     }
@@ -817,8 +835,11 @@ async function handleBotDialogMessage(chatId: number, userId: string, state: str
     const ticketId = state.slice('support:reply:'.length)
     const { attachment, error: attachmentError } = await resolveBotSupportAttachment(media)
     if (attachmentError) {
-      // Вложение не принято: сообщение остаётся в чате, тред показывает причину.
-      html = await getBotSupportThreadScreen(chatId, ticketId, attachmentError)
+      // Не доставлено: сообщение убираем, окно треда временно показывает причину и просит повторить.
+      consumeMessage = true
+      html = await getBotSupportThreadScreen(chatId, ticketId, `⚠️ ${attachmentError} Сообщение не доставлено — отправьте его ещё раз.`)
+      const failedAnchor = await prisma.supportTicket.findUnique({ where: { id: ticketId }, select: { userBotMessageId: true } })
+      editTarget = failedAnchor?.userBotMessageId ? { ticketId, messageId: failedAnchor.userBotMessageId, field: 'userBotMessageId' as const } : null
     } else {
     const result = await replyToTicketFromBot(userId, ticketId, text, attachment)
     if (result.ok) {
@@ -829,9 +850,14 @@ async function handleBotDialogMessage(chatId: number, userId: string, state: str
       editTarget = anchor?.userBotMessageId ? { ticketId, messageId: anchor.userBotMessageId, field: 'userBotMessageId' as const } : null
     } else if (result.error.includes('закрыто') || result.error.includes('не найдено')) {
       await clearBotDialogState(userId)
+      consumeMessage = true
       html = await getBotScreen(chatId, 'support', result.error)
     } else {
-      html = await getBotSupportThreadScreen(chatId, ticketId, result.error)
+      // Не доставлено: сообщение убираем, окно треда временно показывает причину и просит повторить.
+      consumeMessage = true
+      html = await getBotSupportThreadScreen(chatId, ticketId, `⚠️ ${result.error} Сообщение не доставлено — отправьте его ещё раз.`)
+      const anchor = await prisma.supportTicket.findUnique({ where: { id: ticketId }, select: { userBotMessageId: true } })
+      editTarget = anchor?.userBotMessageId ? { ticketId, messageId: anchor.userBotMessageId, field: 'userBotMessageId' as const } : null
     }
     }
   } else if (state.startsWith('admin:reply:')) {

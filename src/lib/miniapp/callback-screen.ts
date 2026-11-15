@@ -35,6 +35,27 @@ async function rememberBotScreenAnchor(chatId: number, messageId: number) {
       error instanceof Error ? error.message : error))
 }
 
+// Есть ли у пользователя живое окно бота. Нужен, чтобы решить, показывать ли
+// анимацию загрузки: черновик исчезает только при отправке нового сообщения,
+// поэтому при правке существующего окна его запускать нельзя.
+export async function hasBotScreenAnchor(chatId: number): Promise<boolean> {
+  const anchor = await prisma.user.findFirst({
+    where: { telegramId: BigInt(chatId), botScreenMessageId: { not: null } },
+    select: { botScreenMessageId: true },
+  }).catch(() => null)
+  return Boolean(anchor?.botScreenMessageId)
+}
+
+// Короткая анимация «экран загружается»: временный черновик, который Telegram
+// сам убирает, когда бот отправляет настоящее сообщение. Где черновики не
+// поддерживаются — тихо пропускаем.
+export async function sendBotScreenLoadingDraft(chatId: number) {
+  await miniAppBotCall('sendRichMessageDraft', {
+    chat_id: chatId, draft_id: 1,
+    rich_message: { html: '<p>✨ Загружаю экран…</p>' },
+  }).catch(() => {})
+}
+
 // Показ экрана в ответ на текст пользователя (меню, команды): правим
 // запомненное окно, а если его ещё нет — отправляем и запоминаем.
 export async function showBotScreen(chatId: number, html: string): Promise<number | null> {
