@@ -60,7 +60,18 @@ jobs:
       - run: npm ci
       - run: npx prisma validate
       - name: Check Prisma migration drift
-        run: npx prisma migrate diff --from-migrations prisma/migrations --to-schema-datamodel prisma/schema.prisma --shadow-database-url "$DIRECT_URL" --exit-code
+        # The shadow-database replay occasionally fails on a fresh Postgres service
+        # before any migration output exists; retry before declaring real drift.
+        run: |
+          for attempt in 1 2 3; do
+            if npx prisma migrate diff --from-migrations prisma/migrations --to-schema-datamodel prisma/schema.prisma --shadow-database-url "$DIRECT_URL" --exit-code; then
+              exit 0
+            fi
+            echo "Drift check attempt $attempt failed; retrying in 10s..."
+            sleep 10
+          done
+          echo "Migration drift check failed after 3 attempts"
+          exit 1
       - name: npm audit report
         run: npm run check:audit
       - run: npm run check:env
