@@ -173,7 +173,8 @@ export async function handleMiniAppUpdate(update: z.infer<typeof telegramUpdateS
       return
     }
     // Пока пользователь не вступил в канал, любые кнопки ведут на экран подписки.
-    const callbackGate = await channelGate(callback.from.id)
+    // Проверка без кэша: нажатие кнопки сразу после выхода из канала блокируется.
+    const callbackGate = await channelGate(callback.from.id, { fresh: true })
     if (callbackGate) {
       await displayCallbackScreen(callback.from.id, callback.message.message_id,
         buildChannelGateScreen(callbackGate.channelUrl), miniAppUrl())
