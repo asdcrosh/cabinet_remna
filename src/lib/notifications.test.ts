@@ -154,6 +154,7 @@ describe('notifyUser', () => {
     expect(broadcastBotMock.sendBroadcastBotMessage).toHaveBeenCalledWith(123, {
       text: 'Скидка 20% до конца недели',
       imageUrl: undefined,
+      imageFileId: undefined,
       button: { label: '💎 Выбрать тариф', data: 'avp:plans' },
     })
     expect(fetch).not.toHaveBeenCalled()

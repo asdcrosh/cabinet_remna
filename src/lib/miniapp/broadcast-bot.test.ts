@@ -18,7 +18,7 @@ vi.mock('@/lib/admin-notifications', () => ({ createAdminNotification: mocks.cre
 vi.mock('@/lib/audit-log', () => ({ writeAuditLog: mocks.writeAuditLog }))
 vi.mock('@/lib/broadcast-campaign', () => ({ createBroadcastCampaign: mocks.createBroadcastCampaign }))
 
-import { broadcastThemes, broadcastThemeView, createBotBroadcast, findBroadcastTheme, validateBroadcastText, BROADCAST_TEXT_MAX } from './broadcast-bot'
+import { broadcastThemes, broadcastThemeView, createBotBroadcast, findBroadcastTheme, parseBroadcastDraft, serializeBroadcastDraft, validateBroadcastText, BROADCAST_TEXT_MAX } from './broadcast-bot'
 import { botScreens, buildBroadcastPreviewScreen, buildBroadcastPromptScreen, buildBroadcastSentScreen, buildBroadcastThemesScreen } from './rich-screens'
 
 describe('broadcast themes', () => {
@@ -48,6 +48,18 @@ describe('broadcast themes', () => {
     expect(validateBroadcastText('абв').ok).toBe(false)
     expect(validateBroadcastText('x'.repeat(BROADCAST_TEXT_MAX + 1)).ok).toBe(false)
     expect(validateBroadcastText('  привет  ')).toEqual({ ok: true, body: 'привет' })
+  })
+
+  it('serializes and parses drafts with an optional photo', () => {
+    const payload = serializeBroadcastDraft({ text: 'Текст рассылки', image: 'file-id-1' })
+    expect(parseBroadcastDraft(payload)).toEqual({ text: 'Текст рассылки', image: 'file-id-1' })
+    expect(parseBroadcastDraft(serializeBroadcastDraft({ text: 'Без фото', image: null }))).toEqual({ text: 'Без фото', image: null })
+    // Ранние черновики хранились простым текстом — они тоже читаются.
+    expect(parseBroadcastDraft('Старый текстовый черновик')).toEqual({ text: 'Старый текстовый черновик', image: null })
+    // Битый JSON читается как текстовый черновик — так хранились ранние версии.
+    expect(parseBroadcastDraft('{"broken":')).toEqual({ text: '{"broken":', image: null })
+    expect(parseBroadcastDraft(null)).toBeNull()
+    expect(parseBroadcastDraft('   ')).toBeNull()
   })
 })
 
@@ -85,7 +97,16 @@ describe('createBotBroadcast', () => {
   it('queues a buttonless campaign for the news theme', async () => {
     const result = await createBotBroadcast('admin-1', 'news', 'Завтра технические работы с 3 до 5 утра')
     expect(result.ok).toBe(true)
-    expect(mocks.createBroadcastCampaign).toHaveBeenCalledWith(expect.objectContaining({ telegramBotButton: null }))
+    expect(mocks.createBroadcastCampaign).toHaveBeenCalledWith(expect.objectContaining({ telegramBotButton: null, telegramImageFileId: null }))
+  })
+
+  it('attaches a photo file id to the campaign when provided', async () => {
+    const result = await createBotBroadcast('admin-1', 'promo', 'Скидка 20% до конца недели', 'photo-file-id-1')
+    expect(result.ok).toBe(true)
+    expect(mocks.createBroadcastCampaign).toHaveBeenCalledWith(expect.objectContaining({
+      telegramImageFileId: 'photo-file-id-1',
+      telegramBotButton: { label: '💎 Выбрать тариф', data: 'avp:plans' },
+    }))
   })
 
   it('respects the feature flag and the rate limit', async () => {

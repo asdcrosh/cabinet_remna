@@ -5,7 +5,7 @@ import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { getBotAdminThreadScreen, getBotAdminTicketsScreen, getBotBroadcastThemesScreen, getBotPaymentScreen, getBotScreen, getBotScreenInput, getBotSupportThreadScreen } from './bot-screens'
 import { botScreens, buildAutoRenewalOffConfirm, buildBroadcastPreviewScreen, buildBroadcastPromptScreen, buildBroadcastSentScreen, buildDeviceDeleteConfirm, buildDeviceScreen, buildSpinResultScreen, buildSupportCategoryScreen, buildSupportPromptScreen, type BotScreen } from './rich-screens'
-import { broadcastThemeView, createBotBroadcast, findBroadcastTheme, validateBroadcastText } from './broadcast-bot'
+import { broadcastThemeView, createBotBroadcast, findBroadcastTheme, parseBroadcastDraft, serializeBroadcastDraft, validateBroadcastText } from './broadcast-bot'
 import { claimChannelReward } from './channel-referrals'
 import { unbindUserDevice } from '@/lib/device-unbind'
 import { BonusBoxError, openBonusBox } from '@/lib/bonus-box'
@@ -16,7 +16,7 @@ import { withDistributedLock } from '@/lib/distributed-lock'
 import { rateLimitKey } from '@/lib/rate-limit'
 import { answerStarsPreCheckout, isOurStarsPayload, refundStarsPayment, settleStarsPayment } from './stars-payments'
 import { displayCallbackScreen } from './callback-screen'
-import { clearBotDialogState, hasPendingBotDialog, setBotDialogState } from './bot-dialog'
+import { clearBotDialogState, getBotDialogStateByTelegram, setBotDialogState } from './bot-dialog'
 import { closeTicketAsAdmin, closeTicketFromBot, createTicketFromBot, isSupportCategory, replyToTicketAsAdmin, replyToTicketFromBot } from './support-bot'
 import { supportCategories } from '@/lib/support'
 import { disableAutoRenewal } from '@/lib/auto-renewal'
@@ -32,6 +32,9 @@ export const telegramUpdateSchema = z.object({
   message: z.object({
     chat: z.object({ id: z.number().int().safe(), type: z.string() }),
     from: user.optional(), text: z.string().max(4096).optional(),
+    caption: z.string().max(4096).optional(),
+    photo: z.array(z.object({ file_id: z.string().max(256), width: z.number(), height: z.number(),
+      file_size: z.number().optional() })).max(16).optional(),
     successful_payment: z.object({ currency: z.string(), total_amount: z.number().int().positive(),
       invoice_payload: z.string().max(128), telegram_payment_charge_id: z.string().min(1).max(256) }).optional(),
     refunded_payment: z.object({ currency: z.string(), total_amount: z.number().int().positive(),
@@ -93,12 +96,19 @@ export async function isPendingBotDialogUpdate(value: unknown) {
   const chat = Reflect.get(message, 'chat')
   const from = Reflect.get(message, 'from')
   const text = Reflect.get(message, 'text')
-  if (!chat || typeof chat !== 'object' || !from || typeof from !== 'object' || typeof text !== 'string') return false
+  const photo = Reflect.get(message, 'photo')
+  const hasPhoto = Array.isArray(photo) && photo.length > 0
+  if (!chat || typeof chat !== 'object' || !from || typeof from !== 'object') return false
+  if (typeof text !== 'string' && !hasPhoto) return false
   if (Reflect.get(chat, 'type') !== 'private') return false
   const chatId = Reflect.get(chat, 'id')
   const fromId = Reflect.get(from, 'id')
   if (typeof chatId !== 'number' || typeof fromId !== 'number' || chatId !== fromId) return false
-  return hasPendingBotDialog(fromId)
+  const state = await getBotDialogStateByTelegram(fromId)
+  if (!state) return false
+  // Фото без текста забираем только у рассылки: в поддержке снимков не ждём.
+  if (typeof text !== 'string') return state.startsWith('broadcast:')
+  return true
 }
 
 // No account details or subscription URLs in messages. The signed Mini App session is the boundary.
@@ -316,7 +326,7 @@ export async function handleMiniAppUpdate(update: z.infer<typeof telegramUpdateS
         select: { id: true, role: true, botDialog: { select: { state: true, payload: true } } } })
       const state = account?.botDialog?.state ?? ''
       const theme = state.startsWith('broadcast:preview:') ? findBroadcastTheme(state.slice('broadcast:preview:'.length)) : null
-      const draft = account?.botDialog?.payload ?? null
+      const draft = parseBroadcastDraft(account?.botDialog?.payload)
       if (!account || account.role === 'USER' || !theme || !draft) {
         const html = await getBotBroadcastThemesScreen(callback.from.id, 'Черновик рассылки не найден. Соберите её заново.')
         await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
@@ -329,7 +339,7 @@ export async function handleMiniAppUpdate(update: z.infer<typeof telegramUpdateS
         await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
         return
       }
-      const result = await createBotBroadcast(account.id, theme.key, draft)
+      const result = await createBotBroadcast(account.id, theme.key, draft.text, draft.image)
       const html = result.ok
         ? buildBroadcastSentScreen(await getBotScreenInput(callback.from.id, 'admin'),
           { themeLabel: result.theme.label, recipients: result.recipients, limited: result.limited })
@@ -396,6 +406,9 @@ export async function handleMiniAppUpdate(update: z.infer<typeof telegramUpdateS
   const message = update.message
   if (!message || message.chat.type !== 'private' || !message.from || message.chat.id !== message.from.id) return
   const text = message.text?.trim() ?? ''
+  const caption = message.caption?.trim() ?? ''
+  const photoFileId = message.photo && message.photo.length > 0 ? message.photo[message.photo.length - 1]!.file_id : null
+  const dialogInput = text || caption
   const menu: Record<string, BotScreen> = {
     'Моя подписка': 'subscription', 'Мои устройства': 'devices', 'Пригласить друга': 'referrals', 'Поддержка': 'support',
     'Тарифы': 'plans', 'Платежи': 'billing', 'Бонусы': 'bonus', 'Уведомления': 'notifications', 'Настройки': 'settings',
@@ -403,11 +416,12 @@ export async function handleMiniAppUpdate(update: z.infer<typeof telegramUpdateS
   const menuScreen = menu[text]
   const isNavigation = Boolean(menuScreen) || text.startsWith('/')
   // Кнопки меню и команды отменяют ожидаемый ввод, свободный текст уходит в него.
-  if (text && !isNavigation) {
+  // Рассылка ждёт и фото с подписью — оно приходит без поля text.
+  if (!isNavigation && (dialogInput || photoFileId)) {
     const account = await prisma.user.findUnique({ where: { telegramId: BigInt(message.from.id) },
       select: { id: true, botDialog: { select: { state: true, payload: true } } } })
     if (account?.botDialog) {
-      await handleBotDialogMessage(message.chat.id, account.id, account.botDialog.state, text, account.botDialog.payload)
+      await handleBotDialogMessage(message.chat.id, account.id, account.botDialog.state, dialogInput, account.botDialog.payload, photoFileId)
       return
     }
   } else if (isNavigation) {
@@ -452,27 +466,34 @@ function checkoutUuid(callbackId: string) {
 // Свободный текст в ожидаемом диалоге: новое обращение, ответ в тикет
 // или ответ администратора. Состояние сохраняется при ошибках валидации,
 // чтобы текст можно было исправить и отправить повторно.
-async function handleBotDialogMessage(chatId: number, userId: string, state: string, text: string, payload?: string | null) {
+async function handleBotDialogMessage(chatId: number, userId: string, state: string, text: string, payload?: string | null, imageFileId?: string | null) {
   let html: string
   if (state.startsWith('broadcast:text:') || state.startsWith('broadcast:preview:')) {
     const prefix = state.startsWith('broadcast:text:') ? 'broadcast:text:' : 'broadcast:preview:'
     const theme = findBroadcastTheme(state.slice(prefix.length))
+    const previousDraft = parseBroadcastDraft(payload)
     if (!theme) {
       await clearBotDialogState(userId)
       html = await getBotScreen(chatId, 'admin', 'Тема рассылки устарела. Начните заново.')
     } else {
       const validated = validateBroadcastText(text)
       if (validated.ok) {
-        await setBotDialogState(userId, `broadcast:preview:${theme.key}`, validated.body)
+        // Текст без нового фото сохраняет приложенное ранее — и наоборот.
+        const draft = { text: validated.body, image: imageFileId ?? previousDraft?.image ?? null }
+        await setBotDialogState(userId, `broadcast:preview:${theme.key}`, serializeBroadcastDraft(draft))
         html = buildBroadcastPreviewScreen(await getBotScreenInput(chatId, 'admin'),
-          { themeLabel: theme.label, segmentLabel: theme.segmentLabel, buttonLabel: theme.button?.label ?? null, text: validated.body })
-      } else if (prefix === 'broadcast:preview:' && payload) {
-        // На шаге превью невалидный текст не затирает старый черновик.
-        html = buildBroadcastPreviewScreen(await getBotScreenInput(chatId, 'admin', `${validated.error} Черновик не изменился.`),
-          { themeLabel: theme.label, segmentLabel: theme.segmentLabel, buttonLabel: theme.button?.label ?? null, text: payload })
+          { themeLabel: theme.label, segmentLabel: theme.segmentLabel, buttonLabel: theme.button?.label ?? null, text: draft.text, withImage: Boolean(draft.image) })
+      } else if (prefix === 'broadcast:preview:' && previousDraft) {
+        // На шаге превью невалидный ввод не затирает старый черновик.
+        const notice = imageFileId && !text.trim()
+          ? 'У фото должна быть подпись с текстом рассылки. Черновик не изменился.'
+          : `${validated.error} Черновик не изменился.`
+        html = buildBroadcastPreviewScreen(await getBotScreenInput(chatId, 'admin', notice),
+          { themeLabel: theme.label, segmentLabel: theme.segmentLabel, buttonLabel: theme.button?.label ?? null, text: previousDraft.text, withImage: Boolean(previousDraft.image) })
       } else {
         // Состояние сохраняется: текст можно исправить и отправить повторно.
-        html = buildBroadcastPromptScreen(await getBotScreenInput(chatId, 'admin', validated.error), broadcastThemeView(theme))
+        const notice = imageFileId && !text.trim() ? 'У фото должна быть подпись с текстом рассылки.' : validated.error
+        html = buildBroadcastPromptScreen(await getBotScreenInput(chatId, 'admin', notice), broadcastThemeView(theme))
       }
     }
   } else if (state.startsWith('support:new:')) {

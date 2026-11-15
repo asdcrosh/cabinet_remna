@@ -38,6 +38,7 @@ type NotifyUserInput = {
   telegramActionLabel?: string
   telegramActionOpenInTelegram?: boolean
   telegramBotButton?: { label: string; data: string }
+  telegramImageFileId?: string
   emailSubject?: string
   emailText?: string
   emailHtml?: string
@@ -101,6 +102,7 @@ export async function notifyUser(input: NotifyUserInput) {
             const viaBot = await sendBroadcastBotMessage(Number(user.telegramId), {
               text: input.telegramText!,
               imageUrl: input.telegramImageUrl,
+              imageFileId: input.telegramImageFileId,
               button: input.telegramBotButton,
             })
             if (viaBot) return
@@ -108,7 +110,8 @@ export async function notifyUser(input: NotifyUserInput) {
           await sendTelegramMessage({
             chatId: user.telegramId!,
             text: input.telegramText!,
-            imageUrl: input.telegramImageUrl,
+            // sendPhoto принимает и file_id, поэтому фото из бота сохраняется и в откате.
+            imageUrl: input.telegramImageUrl ?? input.telegramImageFileId,
             actionUrl: input.telegramActionUrl,
             actionLabel: input.telegramActionLabel,
             actionOpenInTelegram: input.telegramActionOpenInTelegram,

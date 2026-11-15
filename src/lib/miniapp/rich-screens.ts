@@ -335,15 +335,16 @@ export function buildBroadcastPromptScreen(input: RichScreenInput, theme: BotBro
   parts.push(table([['👥 Аудитория', theme.segmentLabel], ['🔘 Кнопка в сообщении', theme.buttonLabel ?? 'Без кнопки']]),
     `<p>${escape(theme.hint)}</p>`,
     `<p>Отправьте текст рассылки одним сообщением (до 1200 символов). Можно использовать переменные: {name}, {plan}, {days_left}.</p>`,
+    '<p>Нужна картинка — просто отправьте фото, а текст укажите в подписи к нему.</p>',
     row(cb('◀️ Отмена', 'bc:cancel')))
   return parts.join('')
 }
 
 // Превью перед отправкой: администратор видит ровно то, что уйдёт пользователям.
-export function buildBroadcastPreviewScreen(input: RichScreenInput, draft: { themeLabel: string; segmentLabel: string; buttonLabel: string | null; text: string }) {
+export function buildBroadcastPreviewScreen(input: RichScreenInput, draft: { themeLabel: string; segmentLabel: string; buttonLabel: string | null; text: string; withImage?: boolean }) {
   const parts = [brandHeader(input.bannerUrl), '<h3>📢 Проверьте рассылку</h3>']
   if (input.notice) parts.push(`<p>💬 ${escape(input.notice)}</p>`)
-  parts.push(table([['Тема', draft.themeLabel], ['👥 Аудитория', draft.segmentLabel], ['🔘 Кнопка', draft.buttonLabel ?? 'Без кнопки']]),
+  parts.push(table([['Тема', draft.themeLabel], ['👥 Аудитория', draft.segmentLabel], ['🔘 Кнопка', draft.buttonLabel ?? 'Без кнопки'], ['🖼 Картинка', draft.withImage ? 'Приложена' : 'Нет']]),
     '<hr><h4>Текст сообщения</h4>',
     `<p>${escape(draft.text).replace(/\n{2,}/g, '<br><br>').replace(/\n/g, '<br>')}</p>`)
   if (draft.buttonLabel) parts.push(`<p>Кнопка «${escape(draft.buttonLabel)}» появится под сообщением и откроет раздел в боте.</p>`)

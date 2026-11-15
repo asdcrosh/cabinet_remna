@@ -100,7 +100,28 @@ export function validateBroadcastText(text: string) {
   return { ok: true as const, body }
 }
 
-export async function createBotBroadcast(adminUserId: string, themeKey: string, text: string) {
+// Черновик рассылки в payload диалога: текст и опциональный file_id фото.
+export type BroadcastDraft = { text: string; image: string | null }
+
+export function serializeBroadcastDraft(draft: BroadcastDraft) {
+  return JSON.stringify(draft)
+}
+
+export function parseBroadcastDraft(payload: string | null | undefined): BroadcastDraft | null {
+  if (!payload) return null
+  try {
+    const value: unknown = JSON.parse(payload)
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      const draft = value as Record<string, unknown>
+      if (typeof draft.text === 'string' && draft.text.trim()) {
+        return { text: draft.text, image: typeof draft.image === 'string' && draft.image ? draft.image.slice(0, 256) : null }
+      }
+    }
+  } catch { /* Ранние черновики хранились простым текстом. */ }
+  return payload.trim() ? { text: payload, image: null } : null
+}
+
+export async function createBotBroadcast(adminUserId: string, themeKey: string, text: string, image?: string | null) {
   const admin = await prisma.user.findUnique({ where: { id: adminUserId }, select: { id: true, role: true } })
   if (!admin || admin.role === 'USER') return { ok: false as const, error: 'Раздел доступен администраторам.' }
   if (!await isFeatureEnabled('broadcasts')) return { ok: false as const, error: 'Рассылки сейчас отключены администратором.' }
@@ -118,6 +139,7 @@ export async function createBotBroadcast(adminUserId: string, themeKey: string, 
     segment: theme.segment,
     channels: ['TELEGRAM'],
     telegramBotButton: theme.button ? { label: theme.button.label, data: `avp:${theme.button.screen}` } : null,
+    telegramImageFileId: image ?? null,
     createdById: admin.id,
   })
 

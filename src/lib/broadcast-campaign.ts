@@ -70,6 +70,7 @@ export async function createBroadcastCampaign(input: {
   actionOpenInTelegram?: boolean
   imageUrl?: string | null
   telegramBotButton?: BroadcastBotButton | null
+  telegramImageFileId?: string | null
   createdById: string
 }) {
   const inactiveDays = input.segment === 'INACTIVE_N_DAYS' ? input.inactiveDays ?? DEFAULT_INACTIVE_DAYS : null
@@ -111,6 +112,7 @@ export async function createBroadcastCampaign(input: {
       channels,
       actionUrl,
       telegramBotButton: input.telegramBotButton ?? null,
+      telegramImageFileId: input.telegramImageFileId ?? null,
     })
 
     return {
@@ -565,6 +567,7 @@ export function buildBroadcastPayload({
   channels,
   actionUrl,
   telegramBotButton,
+  telegramImageFileId,
 }: {
   user: {
     id: string
@@ -583,6 +586,7 @@ export function buildBroadcastPayload({
   channels: Set<BroadcastChannel>
   actionUrl: string
   telegramBotButton?: BroadcastBotButton | null
+  telegramImageFileId?: string | null
 }): BroadcastDeliveryPayload {
   const variables = buildTemplateVariables(user)
   const personalizedTitle = applyTemplateVariables(title, variables)
@@ -604,6 +608,7 @@ export function buildBroadcastPayload({
     telegramActionLabel: channels.has('TELEGRAM') && actionHref ? personalizedActionLabel || 'Открыть' : null,
     telegramActionOpenInTelegram: channels.has('TELEGRAM') ? actionOpenInTelegram : undefined,
     telegramBotButton: channels.has('TELEGRAM') ? telegramBotButton ?? null : null,
+    telegramImageFileId: channels.has('TELEGRAM') ? telegramImageFileId ?? null : null,
     emailSubject: channels.has('EMAIL') ? `${personalizedTitle} — ${getBrandName()}` : null,
     emailText: channels.has('EMAIL') ? `${personalizedPlainBody}${actionHref ? `\n\n${actionUrl}` : ''}` : null,
     emailHtml: channels.has('EMAIL')

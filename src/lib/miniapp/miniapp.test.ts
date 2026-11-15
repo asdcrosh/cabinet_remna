@@ -23,6 +23,8 @@ describe('Telegram Mini App boundaries', () => {
     expect(isMiniAppOwnedUpdate({ message: { text: '/start ref_ABC123' } })).toBe(true)
     expect(isMiniAppOwnedUpdate({ message: { text: '/support' } })).toBe(true)
     expect(telegramUpdateSchema.safeParse({ update_id: 1, message: { chat: { id: 123, type: 'private' }, from: { id: 123 }, text: '/start' } }).success).toBe(true)
+    expect(telegramUpdateSchema.safeParse({ update_id: 2, message: { chat: { id: 123, type: 'private' }, from: { id: 123 },
+      caption: 'Текст рассылки', photo: [{ file_id: 'file-1', width: 90, height: 90 }, { file_id: 'file-2', width: 800, height: 800 }] } }).success).toBe(true)
   })
   it('accepts only current channel members', () => {
     expect(isChannelMember({ status: 'member' })).toBe(true)

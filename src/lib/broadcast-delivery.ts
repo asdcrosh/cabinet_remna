@@ -17,6 +17,7 @@ export interface BroadcastDeliveryPayload {
   telegramActionLabel?: string | null
   telegramActionOpenInTelegram?: boolean
   telegramBotButton?: { label: string; data: string } | null
+  telegramImageFileId?: string | null
   emailSubject?: string | null
   emailText?: string | null
   emailHtml?: string | null
@@ -84,6 +85,7 @@ export async function processBroadcastDeliveryBatch(options: {
         telegramActionLabel: payload.telegramActionLabel ?? undefined,
         telegramActionOpenInTelegram: payload.telegramActionOpenInTelegram,
         telegramBotButton: payload.telegramBotButton ?? undefined,
+        telegramImageFileId: payload.telegramImageFileId ?? undefined,
         emailSubject: payload.emailSubject ?? undefined,
         emailText: payload.emailText ?? undefined,
         emailHtml: payload.emailHtml ?? undefined,
@@ -223,6 +225,7 @@ function parsePayload(value: Prisma.JsonValue): BroadcastDeliveryPayload {
     telegramActionLabel: nullableString(payload.telegramActionLabel),
     telegramActionOpenInTelegram: payload.telegramActionOpenInTelegram === true,
     telegramBotButton: parseBotButton(payload.telegramBotButton),
+    telegramImageFileId: nullableString(payload.telegramImageFileId),
     emailSubject: nullableString(payload.emailSubject),
     emailText: nullableString(payload.emailText),
     emailHtml: nullableString(payload.emailHtml),

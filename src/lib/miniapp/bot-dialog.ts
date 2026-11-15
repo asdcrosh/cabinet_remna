@@ -25,12 +25,13 @@ export async function clearBotDialogState(userId: string) {
   await prisma.telegramBotDialog.deleteMany({ where: { userId } })
 }
 
-// Webhook вызывает до передачи текста старому боту: сообщение с ожидающим
-// состоянием принадлежит новому обработчику, даже если это произвольный текст.
-export async function hasPendingBotDialog(telegramId: number) {
+// Webhook вызывает до передачи сообщения старому боту: с ожидающим состоянием
+// оно принадлежит новому обработчику, даже если это произвольный текст
+// или фото для рассылки.
+export async function getBotDialogStateByTelegram(telegramId: number) {
   const user = await prisma.user.findUnique({
     where: { telegramId: BigInt(telegramId) },
-    select: { botDialog: { select: { userId: true } } },
+    select: { botDialog: { select: { state: true } } },
   })
-  return Boolean(user?.botDialog)
+  return user?.botDialog?.state ?? null
 }
