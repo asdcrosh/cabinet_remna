@@ -15,7 +15,7 @@ import { createPaymentForUser } from '@/lib/payment-checkout'
 import { withDistributedLock } from '@/lib/distributed-lock'
 import { rateLimitKey } from '@/lib/rate-limit'
 import { answerStarsPreCheckout, isOurStarsPayload, refundStarsPayment, settleStarsPayment } from './stars-payments'
-import { displayCallbackScreen, hasBotScreenAnchor, sendBotScreenLoadingDraft, showBotScreen } from './callback-screen'
+import { displayCallbackScreen, showBotScreen } from './callback-screen'
 import { clearBotDialogState, getBotDialogStateByTelegram, setBotDialogState } from './bot-dialog'
 import { addTicketNoteAsAdmin, assignTicketAsAdmin, closeTicketAsAdmin, closeTicketFromBot, createTicketFromBot, isSupportCategory, rateTicketFromBot, replyToTicketAsAdmin, replyToTicketFromBot } from './support-bot'
 import { supportReplyTemplates } from './support-templates'
@@ -668,10 +668,8 @@ export async function handleMiniAppUpdate(update: z.infer<typeof telegramUpdateS
   if (menuScreen && process.env.TELEGRAM_RICH_MESSAGES_ENABLED === 'true') {
     // Единое окно: текст кнопки меню убираем, экран обновляется на месте.
     await miniAppBotCall('deleteMessage', { chat_id: message.chat.id, message_id: message.message_id }).catch(() => {})
-    // Анимация: «печатает…», пока экран собирается. Черновик загрузки — только если
-    // окна ещё нет и экран уйдёт новым сообщением (при правке он бы завис на 30 секунд).
+    // Анимация «печатает…», пока экран собирается.
     await miniAppBotCall('sendChatAction', { chat_id: message.chat.id, action: 'typing' }).catch(() => {})
-    if (!await hasBotScreenAnchor(message.chat.id)) await sendBotScreenLoadingDraft(message.chat.id)
     await showBotScreen(message.chat.id, await getBotScreen(message.from.id, menuScreen))
     return
   }
@@ -711,11 +709,10 @@ export async function handleMiniAppUpdate(update: z.infer<typeof telegramUpdateS
   }
   const content = welcomeMessage(section, referral)
   if (process.env.TELEGRAM_RICH_MESSAGES_ENABLED === 'true') {
-    // Команда убирается, экран открывается в едином окне бота. Пока он собирается —
-    // «печатает…» и, если окна ещё нет, короткий черновик-загрузка.
+    // Команда убирается, экран открывается в едином окне бота.
+    // Пока экран собирается — анимация «печатает…».
     await miniAppBotCall('deleteMessage', { chat_id: message.chat.id, message_id: message.message_id }).catch(() => {})
     await miniAppBotCall('sendChatAction', { chat_id: message.chat.id, action: 'typing' }).catch(() => {})
-    if (!await hasBotScreenAnchor(message.chat.id)) await sendBotScreenLoadingDraft(message.chat.id)
     // Переход по ссылке из анонса в канале встречаем экраном новых возможностей.
     const html = command === '/start' && startPayload === 'update'
       ? buildWhatsNewScreen(await getBotScreenInput(message.from.id, 'home'))
