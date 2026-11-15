@@ -29,7 +29,10 @@ export async function displayCallbackScreen(chatId: number, messageId: number, h
 // Единое окно бота: запоминаем последнее экранное сообщение пользователя,
 // чтобы навигация текстовыми кнопками и командами правила его на месте.
 async function rememberBotScreenAnchor(chatId: number, messageId: number) {
-  await prisma.user.updateMany({ where: { telegramId: BigInt(chatId) }, data: { botScreenMessageId: messageId } }).catch(() => {})
+  await prisma.user.updateMany({ where: { telegramId: BigInt(chatId) }, data: { botScreenMessageId: messageId } })
+    // Колонки нет до применения миграции — логируем, иначе окно молча шлёт новые сообщения.
+    .catch(error => console.warn('[miniapp] bot screen anchor not saved (миграции применены?):',
+      error instanceof Error ? error.message : error))
 }
 
 // Показ экрана в ответ на текст пользователя (меню, команды): правим
@@ -43,8 +46,17 @@ export async function showBotScreen(chatId: number, html: string): Promise<numbe
     const used = await displayCallbackScreen(chatId, anchor.botScreenMessageId, html)
     if (used) return used
   }
+  // Reply-клавиатуру легаси-меню убираем служебным сообщением и сразу удаляем его:
+  // сообщение, отправленное с ReplyKeyboardRemove, Telegram не даёт редактировать,
+  // поэтому якорем единого окна может быть только «чистое» сообщение без reply_markup.
+  const carrier = await miniAppBotCall<{ message_id?: number }>('sendMessage', {
+    chat_id: chatId, text: '⏳ Обновляем окно…', reply_markup: { remove_keyboard: true },
+  }).catch(() => null)
+  if (carrier && typeof carrier.message_id === 'number') {
+    await miniAppBotCall('deleteMessage', { chat_id: chatId, message_id: carrier.message_id }).catch(() => {})
+  }
   const sent = await miniAppBotCall<{ message_id?: number }>('sendRichMessage', {
-    chat_id: chatId, rich_message: { html }, protect_content: true, reply_markup: { remove_keyboard: true },
+    chat_id: chatId, rich_message: { html }, protect_content: true,
   }).catch(() => null)
   const used = sent && typeof sent.message_id === 'number' ? sent.message_id : null
   if (used) await rememberBotScreenAnchor(chatId, used)
