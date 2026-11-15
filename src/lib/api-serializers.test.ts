@@ -50,6 +50,7 @@ describe('api serializers', () => {
       subscriptionId: null,
       planId: 'plan-1',
       promoCodeId: null,
+      botInvoiceMessageId: null,
       autoRenewalId: null,
       autoRenewalConsentAcceptedAt: null,
       autoRenewalConsentVersion: null,

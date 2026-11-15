@@ -4,7 +4,7 @@ import { miniAppUrl } from './config'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { getBotAdminThreadScreen, getBotAdminTicketsScreen, getBotBroadcastThemesScreen, getBotPaymentScreen, getBotPlansPromoScreen, getBotScreen, getBotScreenInput, getBotSupportThreadScreen, validateBotPromoCode } from './bot-screens'
-import { botScreens, buildAdminAssignScreen, buildAdminTemplatesScreen, buildAutoRenewalOffConfirm, buildBroadcastPreviewScreen, buildBroadcastPromptScreen, buildBroadcastSentScreen, buildChannelGateScreen, buildDeviceDeleteConfirm, buildDeviceScreen, buildSpinResultScreen, buildSupportCategoryScreen, buildSupportPromptScreen, buildWhatsNewScreen, type BotScreen } from './rich-screens'
+import { botScreens, buildAdminAssignScreen, buildAdminTemplatesScreen, buildAutoRenewalOffConfirm, buildBroadcastPreviewScreen, buildBroadcastPromptScreen, buildBroadcastSentScreen, buildChannelGateScreen, buildDeviceDeleteConfirm, buildDeviceScreen, buildSpinResultScreen, buildStarsInvoiceScreen, buildSupportCategoryScreen, buildSupportPromptScreen, buildWhatsNewScreen, type BotScreen } from './rich-screens'
 import { broadcastThemeView, createBotBroadcast, findBroadcastTheme, parseBroadcastDraft, serializeBroadcastDraft, validateBroadcastText } from './broadcast-bot'
 import { channelGate, claimChannelReward } from './channel-referrals'
 import { unbindUserDevice } from '@/lib/device-unbind'
@@ -140,6 +140,31 @@ export async function handleMiniAppUpdate(update: z.infer<typeof telegramUpdateS
   if (update.message?.successful_payment || update.message?.refunded_payment) {
     const message = update.message
     if (message.chat.type !== 'private' || (message.from && message.chat.id !== message.from.id)) throw new Error('Unexpected Stars payer')
+    if (process.env.TELEGRAM_RICH_MESSAGES_ENABLED === 'true') {
+      // Единое окно: счёт и сервисное сообщение об оплате убираем, экран
+      // обновляется сам — чат остаётся чистым.
+      if (message.successful_payment) {
+        const settled = await settleStarsPayment(message.chat.id, message.successful_payment)
+        if (!settled.alreadySettled) {
+          const paymentId = message.successful_payment.invoice_payload.slice(4)
+          const payment = await prisma.payment.findUnique({ where: { id: paymentId }, select: { botInvoiceMessageId: true } })
+          if (payment?.botInvoiceMessageId) {
+            await miniAppBotCall('deleteMessage', { chat_id: message.chat.id, message_id: payment.botInvoiceMessageId }).catch(() => {})
+            await prisma.payment.update({ where: { id: paymentId }, data: { botInvoiceMessageId: null } }).catch(() => {})
+          }
+          await miniAppBotCall('deleteMessage', { chat_id: message.chat.id, message_id: message.message_id }).catch(() => {})
+          await miniAppBotCall('sendChatAction', { chat_id: message.chat.id, action: 'typing' }).catch(() => {})
+          await showBotScreen(message.chat.id, await getBotScreen(message.chat.id, 'subscription',
+            '🎉 Оплата прошла — подписка обновлена!'), message.message_id)
+        }
+      } else if (message.refunded_payment) {
+        await refundStarsPayment(message.chat.id, message.refunded_payment)
+        await miniAppBotCall('deleteMessage', { chat_id: message.chat.id, message_id: message.message_id }).catch(() => {})
+        await showBotScreen(message.chat.id, await getBotScreen(message.chat.id, 'billing',
+          '↩️ Оплата возвращена — Stars поступят на ваш баланс Telegram.'), message.message_id)
+      }
+      return
+    }
     if (message.successful_payment) await settleStarsPayment(message.chat.id, message.successful_payment)
     else if (message.refunded_payment) await refundStarsPayment(message.chat.id, message.refunded_payment)
     return
@@ -958,21 +983,18 @@ function callbackUuid(salt: string, callbackId: string) {
 }
 
 async function sendStarsInvoiceFromBot(telegramId: number, callbackId: string, planId: string, promoCode?: string) {
-  if (!starsEnabled()) {
-    await miniAppBotCall('sendMessage', { chat_id: telegramId, text: 'Оплата Stars временно недоступна.' })
-    return
+  // Ошибки и статусы показываем в едином окне, а не отдельными сообщениями.
+  const rich = process.env.TELEGRAM_RICH_MESSAGES_ENABLED === 'true'
+  const fail = async (notice: string, screen: BotScreen = 'plans') => {
+    if (rich) await showBotScreen(telegramId, await getBotScreen(telegramId, screen, notice))
+    else await miniAppBotCall('sendMessage', { chat_id: telegramId, text: notice })
   }
+  if (!starsEnabled()) return fail('Оплата Stars временно недоступна.')
   const account = await prisma.user.findUnique({ where: { telegramId: BigInt(telegramId) }, select: { id: true } })
-  if (!account) {
-    await miniAppBotCall('sendMessage', { chat_id: telegramId, text: 'Войдите через Telegram в приложение AlekseevVP, затем выберите тариф.' })
-    return
-  }
+  if (!account) return fail('Войдите через Telegram в приложение AlekseevVP, затем выберите тариф.', 'home')
   const catalog = await buildPlanCatalog({ userId: account.id })
   const plan = catalog.plans.find(item => item.id === planId)
-  if (!plan) {
-    await miniAppBotCall('sendMessage', { chat_id: telegramId, text: 'Тариф больше недоступен. Откройте актуальный список.' })
-    return
-  }
+  if (!plan) return fail('Тариф больше недоступен. Откройте актуальный список.')
   const request = new Request(miniAppUrl(), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
     planId, purchaseType: 'SUBSCRIPTION', provider: 'TELEGRAM_STARS', deviceLimit: plan.initialDeviceLimit,
     idempotencyKey: checkoutUuid(callbackId),
@@ -980,28 +1002,26 @@ async function sendStarsInvoiceFromBot(telegramId: number, callbackId: string, p
   }) })
   const limitKey = `bot-stars:${createHash('sha256').update(String(telegramId)).digest('hex')}`
   const limited = await rateLimitKey(limitKey, 10, 60_000)
-  if (!limited.ok) {
-    await miniAppBotCall('sendMessage', { chat_id: telegramId, text: 'Слишком много попыток оплаты. Попробуйте позже.' })
-    return
-  }
+  if (!limited.ok) return fail('Слишком много попыток оплаты. Попробуйте позже.')
   const locked = await withDistributedLock(`billing-operation:${account.id}`,
     () => createPaymentForUser(request, account.id, { telegramBot: true }), { timeoutMs: 30_000 })
-  if (!locked.acquired) {
-    await miniAppBotCall('sendMessage', { chat_id: telegramId, text: 'Другая операция оплаты ещё выполняется. Повторите позже.' })
-    return
-  }
+  if (!locked.acquired) return fail('Другая операция оплаты ещё выполняется. Повторите позже.')
   const result = await locked.value.json() as { confirmationUrl?: string; localPaymentId?: string; starsAmount?: number; error?: string; redirectUrl?: string }
-  if (result.error) {
-    await miniAppBotCall('sendMessage', { chat_id: telegramId, text: result.error })
-    return
+  if (result.error) return fail(result.error)
+  if (result.redirectUrl) return fail('🎉 Доступ оформлен — подписка уже обновлена!', 'subscription')
+  if (!result.confirmationUrl || !result.localPaymentId || typeof result.starsAmount !== 'number'
+      || !Number.isInteger(result.starsAmount)) throw new Error('Stars invoice was not created')
+  const durationLabel = plan.unlimitedDuration ? 'Бессрочная' : `${plan.durationDays} дней`
+  if (rich) {
+    // Окно показывает красивый экран счёта, сам инвойс — прямо под ним.
+    await showBotScreen(telegramId, buildStarsInvoiceScreen({
+      planName: plan.name, durationLabel, starsAmount: result.starsAmount, promoCode: promoCode ?? null }))
   }
-  if (result.redirectUrl) {
-    await miniAppBotCall('sendMessage', { chat_id: telegramId, text: 'Доступ оформлен. Откройте подписку, чтобы увидеть новый срок.' })
-    return
-  }
-  if (!result.confirmationUrl || !result.localPaymentId || !Number.isInteger(result.starsAmount)) throw new Error('Stars invoice was not created')
-  await miniAppBotCall('sendInvoice', { chat_id: telegramId, title: plan.name.slice(0, 32),
+  const invoice = await miniAppBotCall<{ message_id?: number }>('sendInvoice', { chat_id: telegramId, title: plan.name.slice(0, 32),
     description: plan.unlimitedDuration ? 'Бессрочная подписка AlekseevVP' : `Подписка AlekseevVP на ${plan.durationDays} дней`,
     payload: `avp:${result.localPaymentId}`, provider_token: '', currency: 'XTR',
     prices: [{ label: plan.name.slice(0, 32), amount: result.starsAmount }], protect_content: true })
+  // Запоминаем сообщение-счёт: после оплаты удалим его, чат останется чистым.
+  await prisma.payment.update({ where: { id: result.localPaymentId },
+    data: { botInvoiceMessageId: typeof invoice?.message_id === 'number' ? invoice.message_id : null } }).catch(() => {})
 }

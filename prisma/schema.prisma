@@ -809,6 +809,8 @@ model Payment {
   checkoutKey       String?
   starsAmount       Int?
   starsRateKopecks  Int?
+  // Сообщение-счёт Stars в боте: удаляем его после успешной оплаты.
+  botInvoiceMessageId Int?
 
   // Legacy-поля ЮKassa. Сохраняются для совместимости со старыми платежами.
   yookassaId      String?                @unique

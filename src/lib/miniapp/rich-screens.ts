@@ -531,3 +531,19 @@ export function buildChannelGateScreen(channelUrl: string, notice?: string) {
   )
   return parts.join('')
 }
+
+// Экран выставленного счёта Stars: живёт в едином окне, сам инвойс — под ним.
+export function buildStarsInvoiceScreen(input: { planName: string; durationLabel: string;
+  starsAmount: number; promoCode?: string | null }) {
+  const parts = ['<h2>AlekseevVP</h2>', '<h3>⭐ Счёт на оплату</h3>']
+  parts.push(table([
+    ['💎 Тариф', input.planName],
+    ['📅 Срок', input.durationLabel],
+    ...(input.promoCode ? [['🏷 Промокод', input.promoCode]] : []),
+    ['⭐ К оплате', `${input.starsAmount} Stars`],
+  ]))
+  parts.push('<p>Счёт отправлен сообщением ниже — нажмите <b>«Оплатить»</b> в нём.</p>',
+    '<p>После оплаты это окно обновится автоматически, а счёт исчезнет.</p>',
+    row(cb('💎 К тарифам', 'plans'), cb('🏠 На главную', 'home')))
+  return parts.join('')
+}
