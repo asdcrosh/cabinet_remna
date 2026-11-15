@@ -5,7 +5,7 @@ import { createAdminNotification } from '@/lib/admin-notifications'
 import { buildAdminSupportTelegramText } from '@/lib/admin-telegram-notifications'
 import { notifySupportReply } from '@/lib/notifications'
 import { writeAuditLog } from '@/lib/audit-log'
-import { syncSupportThreadViews } from './support-sync'
+import { syncAdminTicketsQueues, syncSupportThreadViews } from './support-sync'
 
 export type BotSupportResult = { ok: true } | { ok: false; error: string }
 
@@ -35,6 +35,7 @@ export async function createTicketFromBot(userId: string, category: SupportCateg
     select: { id: true, subject: true },
   })
   await notifyAdmins(userId, 'ticket', ticket.id, ticket.subject, text)
+  await syncAdminTicketsQueues('🆕 Новое обращение в очереди.')
   return { ok: true }
 }
 
@@ -61,8 +62,9 @@ export async function replyToTicketFromBot(userId: string, ticketId: string, mes
     return message
   })
   await notifyAdmins(userId, 'message', ticket.id, ticket.subject, text, created.id)
-  // Открытое окно переписки у администратора обновляется на месте.
+  // Открытое окно переписки и очередь у администратора обновляются на месте.
   await syncSupportThreadViews(ticket.id, { admin: true, adminNotice: '💬 Новое сообщение от пользователя.' })
+  await syncAdminTicketsQueues()
   return { ok: true }
 }
 
@@ -72,6 +74,7 @@ export async function closeTicketFromBot(userId: string, ticketId: string): Prom
   if (ticket.status === 'CLOSED') return { ok: true }
   await prisma.supportTicket.update({ where: { id: ticket.id }, data: { status: 'CLOSED', closedAt: new Date() } })
   await syncSupportThreadViews(ticketId, { admin: true, adminNotice: '✅ Пользователь закрыл обращение.' })
+  await syncAdminTicketsQueues()
   return { ok: true }
 }
 
@@ -115,6 +118,7 @@ export async function replyToTicketAsAdmin(adminId: string, ticketId: string, me
     message: 'Администратор ответил в обращении из бота',
     metadata: { ticketId: ticket.id, messageId: created.id, fromStatus: ticket.status, toStatus: 'WAITING_USER' },
   })
+  await syncAdminTicketsQueues()
   return { ok: true }
 }
 
@@ -134,6 +138,7 @@ export async function closeTicketAsAdmin(adminId: string, ticketId: string): Pro
     })
     // Окно переписки у пользователя сразу показывает «Закрыто».
     await syncSupportThreadViews(ticketId, { user: true })
+    await syncAdminTicketsQueues()
   }
   return { ok: true }
 }

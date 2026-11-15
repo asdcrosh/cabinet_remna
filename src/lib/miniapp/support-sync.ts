@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma'
-import { getBotAdminThreadScreen, getBotSupportThreadScreen } from './bot-screens'
+import { getBotAdminThreadScreen, getBotAdminTicketsScreen, getBotSupportThreadScreen } from './bot-screens'
 import { displayCallbackScreen } from './callback-screen'
 
 // Одно окно переписки в боте: сообщение с тикетом редактируется на месте
@@ -44,4 +44,27 @@ export async function syncSupportThreadViews(ticketId: string, opts: { user?: bo
   if (opts.user) tasks.push(refreshUserThreadView(ticketId))
   if (opts.admin) tasks.push(refreshAdminThreadView(ticketId, opts.adminNotice))
   await Promise.allSettled(tasks)
+}
+
+// Очередь обращений у администраторов: обновляется на месте при новых
+// обращениях, ответах и закрытиях — как открытый тред.
+export async function refreshAdminTicketsQueues(notice?: string) {
+  const admins = await prisma.user.findMany({
+    where: { adminQueueBotMessageId: { not: null }, role: { not: 'USER' }, telegramId: { not: null } },
+    select: { id: true, telegramId: true, adminQueueBotMessageId: true },
+    take: 25,
+  })
+  await Promise.allSettled(admins.map(async (admin) => {
+    if (!admin.telegramId || !admin.adminQueueBotMessageId) return
+    const chatId = Number(admin.telegramId)
+    const html = await getBotAdminTicketsScreen(chatId, notice)
+    const used = await displayCallbackScreen(chatId, admin.adminQueueBotMessageId, html)
+    if (used && used !== admin.adminQueueBotMessageId) {
+      await prisma.user.updateMany({ where: { id: admin.id }, data: { adminQueueBotMessageId: used } })
+    }
+  }))
+}
+
+export async function syncAdminTicketsQueues(notice?: string) {
+  await refreshAdminTicketsQueues(notice).catch(() => {})
 }

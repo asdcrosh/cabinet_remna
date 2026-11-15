@@ -266,9 +266,13 @@ export async function handleMiniAppUpdate(update: z.infer<typeof telegramUpdateS
       const html = await getBotSupportThreadScreen(callback.from.id, ticketId)
       const used = await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
       // Запоминаем, в каком сообщении живёт тред: ответы обновят его на месте.
+      // Другие треды в этом же сообщении больше не открыты — их якоря снимаем.
       const account = await prisma.user.findUnique({ where: { telegramId: BigInt(callback.from.id) }, select: { id: true } })
       if (account && used) {
-        await prisma.supportTicket.updateMany({ where: { id: ticketId, userId: account.id }, data: { userBotMessageId: used } })
+        await prisma.$transaction([
+          prisma.supportTicket.updateMany({ where: { id: ticketId, userId: account.id }, data: { userBotMessageId: used } }),
+          prisma.supportTicket.updateMany({ where: { id: { not: ticketId }, userId: account.id, userBotMessageId: used }, data: { userBotMessageId: null } }),
+        ])
       }
       return
     }
@@ -362,7 +366,16 @@ export async function handleMiniAppUpdate(update: z.infer<typeof telegramUpdateS
     }
     if (action === 'admt') {
       const html = await getBotAdminTicketsScreen(callback.from.id)
-      await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
+      const used = await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
+      const account = await prisma.user.findUnique({ where: { telegramId: BigInt(callback.from.id) }, select: { id: true, role: true } })
+      if (account && account.role !== 'USER' && used) {
+        // Сообщение теперь показывает очередь: якоря тредов в нём снимаем,
+        // чтобы обновление треда не затёрло список.
+        await prisma.$transaction([
+          prisma.user.updateMany({ where: { id: account.id }, data: { adminQueueBotMessageId: used } }),
+          prisma.supportTicket.updateMany({ where: { adminBotChatId: BigInt(callback.from.id), adminBotMessageId: used }, data: { adminBotMessageId: null } }),
+        ])
+      }
       return
     }
     if (action.startsWith('admt:')) {
@@ -370,10 +383,16 @@ export async function handleMiniAppUpdate(update: z.infer<typeof telegramUpdateS
       const html = await getBotAdminThreadScreen(callback.from.id, ticketId)
       const used = await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
       // Якорь окна треда для последнего просмотревшего администратора.
+      // Очередь и другие треды в этом сообщении больше не показаны — их якоря снимаем.
       const account = await prisma.user.findUnique({ where: { telegramId: BigInt(callback.from.id) }, select: { id: true, role: true } })
       if (account && account.role !== 'USER' && used) {
-        await prisma.supportTicket.updateMany({ where: { id: ticketId },
-          data: { adminBotChatId: BigInt(callback.from.id), adminBotMessageId: used } })
+        await prisma.$transaction([
+          prisma.supportTicket.updateMany({ where: { id: ticketId },
+            data: { adminBotChatId: BigInt(callback.from.id), adminBotMessageId: used } }),
+          prisma.supportTicket.updateMany({ where: { id: { not: ticketId }, adminBotChatId: BigInt(callback.from.id), adminBotMessageId: used },
+            data: { adminBotMessageId: null } }),
+          prisma.user.updateMany({ where: { id: account.id, adminQueueBotMessageId: used }, data: { adminQueueBotMessageId: null } }),
+        ])
       }
       return
     }

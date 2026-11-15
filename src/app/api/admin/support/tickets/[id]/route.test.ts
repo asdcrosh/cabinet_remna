@@ -18,7 +18,7 @@ vi.mock('@/lib/prisma', () => ({ prisma: mocks.prisma }))
 vi.mock('@/lib/audit-log', () => ({ writeAuditLog: mocks.writeAuditLog }))
 vi.mock('@/lib/notifications', () => ({ notifySupportReply: vi.fn() }))
 vi.mock('@/lib/feature-flags', () => ({ isFeatureEnabled: () => true }))
-vi.mock('@/lib/miniapp/support-sync', () => ({ syncSupportThreadViews: vi.fn(async () => {}) }))
+vi.mock('@/lib/miniapp/support-sync', () => ({ syncSupportThreadViews: vi.fn(async () => {}), syncAdminTicketsQueues: vi.fn(async () => {}) }))
 
 import { GET, PATCH } from './route'
 

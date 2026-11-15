@@ -12,7 +12,7 @@ import {
 import { createAdminNotification } from '@/lib/admin-notifications'
 import { isFeatureEnabled } from '@/lib/feature-flags'
 import { buildAdminSupportTelegramText } from '@/lib/admin-telegram-notifications'
-import { syncSupportThreadViews } from '@/lib/miniapp/support-sync'
+import { syncAdminTicketsQueues, syncSupportThreadViews } from '@/lib/miniapp/support-sync'
 import {
   readSupportMutationRequest,
   SupportAttachmentError,
@@ -208,8 +208,9 @@ export const POST = withAuth(async (req: Request, { params }: { params: Promise<
       : {}),
   })
 
-  // Открытое окно переписки у администратора в боте обновляется на месте.
+  // Открытое окно переписки и очередь у администратора в боте обновляются на месте.
   await syncSupportThreadViews(ticket.id, { admin: true, adminNotice: '💬 Новое сообщение от пользователя.' })
+  await syncAdminTicketsQueues()
 
   return jsonResponse({ message: serializeSupportMessage(message) }, { status: 201 })
 })
@@ -244,6 +245,7 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: Promise
   }
 
   await syncSupportThreadViews(id, { user: true, admin: true, adminNotice: '✅ Пользователь закрыл обращение.' })
+  await syncAdminTicketsQueues()
 
   return jsonResponse({ ok: true })
 })

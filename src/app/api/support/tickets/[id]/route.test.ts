@@ -16,7 +16,7 @@ vi.mock('@/lib/auth/guard', () => ({
 }))
 vi.mock('@/lib/prisma', () => ({ prisma: mocks.prisma }))
 vi.mock('@/lib/feature-flags', () => ({ isFeatureEnabled: () => true }))
-vi.mock('@/lib/miniapp/support-sync', () => ({ syncSupportThreadViews: vi.fn(async () => {}) }))
+vi.mock('@/lib/miniapp/support-sync', () => ({ syncSupportThreadViews: vi.fn(async () => {}), syncAdminTicketsQueues: vi.fn(async () => {}) }))
 vi.mock('@/lib/rate-limit', () => ({ rateLimit: vi.fn() }))
 vi.mock('@/lib/admin-notifications', () => ({ createAdminNotification: vi.fn() }))
 

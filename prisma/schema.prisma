@@ -161,6 +161,8 @@ model User {
   autoRenewal                AutoRenewal?
   retentionEvents            SubscriptionRetention[]
   botDialog                  TelegramBotDialog?
+  /// Якорь экрана очереди обращений в боте: какое сообщение обновлять при новых тикетах
+  adminQueueBotMessageId       Int?
 
   @@index([email])
   @@index([role])

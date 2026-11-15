@@ -16,6 +16,7 @@ import {
   SupportAttachmentError,
   supportAttachmentSelect,
 } from '@/lib/support-attachments'
+import { syncAdminTicketsQueues } from '@/lib/miniapp/support-sync'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -128,6 +129,8 @@ export const POST = withAuth(async (req: Request) => {
         }
       : {}),
   })
+
+  await syncAdminTicketsQueues('🆕 Новое обращение в очереди.')
 
   return jsonResponse({
     ticket: {
