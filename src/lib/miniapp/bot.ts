@@ -3,8 +3,8 @@ import { miniAppBotCall } from './bot-api'
 import { miniAppUrl } from './config'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
-import { getBotPaymentScreen, getBotScreen, getBotScreenInput } from './bot-screens'
-import { botScreens, buildDeviceDeleteConfirm, buildDeviceScreen, buildSpinResultScreen, type BotScreen } from './rich-screens'
+import { getBotPaymentScreen, getBotScreen, getBotScreenInput, getBotSupportThreadScreen } from './bot-screens'
+import { botScreens, buildAutoRenewalOffConfirm, buildDeviceDeleteConfirm, buildDeviceScreen, buildSpinResultScreen, buildSupportCategoryScreen, buildSupportPromptScreen, type BotScreen } from './rich-screens'
 import { claimChannelReward } from './channel-referrals'
 import { unbindUserDevice } from '@/lib/device-unbind'
 import { BonusBoxError, openBonusBox } from '@/lib/bonus-box'
@@ -15,6 +15,10 @@ import { withDistributedLock } from '@/lib/distributed-lock'
 import { rateLimitKey } from '@/lib/rate-limit'
 import { answerStarsPreCheckout, isOurStarsPayload, refundStarsPayment, settleStarsPayment } from './stars-payments'
 import { displayCallbackScreen } from './callback-screen'
+import { clearBotDialogState, hasPendingBotDialog, setBotDialogState } from './bot-dialog'
+import { closeTicketFromBot, createTicketFromBot, isSupportCategory, replyToTicketFromBot } from './support-bot'
+import { supportCategories } from '@/lib/support'
+import { disableAutoRenewal } from '@/lib/auto-renewal'
 
 const user = z.object({ id: z.number().int().positive().safe() })
 export const telegramUpdateSchema = z.object({
@@ -76,6 +80,24 @@ export function isMiniAppOwnedUpdate(value: unknown) {
   if (['Моя подписка', 'Мои устройства', 'Пригласить друга', 'Поддержка'].includes(content)) return true
   return /^\/(?:app|menu|subscription|connect|plans|billing|devices|bonus|notifications|referrals|settings|admin|support|paysupport|help)(?:@[A-Za-z0-9_]+)?(?:\s|$)/.test(content)
     || /^\/start(?:@[A-Za-z0-9_]+)?(?:\s+ref_[A-Z0-9]{6,8})?$/.test(content)
+}
+
+// Произвольный текст принадлежит новому боту, если пользователя ждёт ввод
+// (например, сообщение в поддержку). Проверяется до передачи старому боту.
+export async function isPendingBotDialogUpdate(value: unknown) {
+  if (!value || typeof value !== 'object') return false
+  const message = Reflect.get(value, 'message')
+  if (!message || typeof message !== 'object') return false
+  if (Reflect.has(message, 'successful_payment') || Reflect.has(message, 'refunded_payment')) return false
+  const chat = Reflect.get(message, 'chat')
+  const from = Reflect.get(message, 'from')
+  const text = Reflect.get(message, 'text')
+  if (!chat || typeof chat !== 'object' || !from || typeof from !== 'object' || typeof text !== 'string') return false
+  if (Reflect.get(chat, 'type') !== 'private') return false
+  const chatId = Reflect.get(chat, 'id')
+  const fromId = Reflect.get(from, 'id')
+  if (typeof chatId !== 'number' || typeof fromId !== 'number' || chatId !== fromId) return false
+  return hasPendingBotDialog(fromId)
 }
 
 // No account details or subscription URLs in messages. The signed Mini App session is the boundary.
@@ -171,6 +193,90 @@ export async function handleMiniAppUpdate(update: z.infer<typeof telegramUpdateS
       await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
       return
     }
+    if (action.startsWith('set:')) {
+      const key = action.slice(4)
+      const field = key === 'telegram' ? 'telegramEnabled' : key === 'email' ? 'emailEnabled' : key === 'broadcasts' ? 'broadcastsEnabled' : null
+      const account = await prisma.user.findUnique({ where: { telegramId: BigInt(callback.from.id) }, select: { id: true } })
+      let notice = 'Сначала войдите в приложение через Telegram'
+      if (account && field) {
+        const current = await prisma.userNotificationPreference.findUnique({ where: { userId: account.id } })
+        const next = !(current?.[field] ?? true)
+        await prisma.userNotificationPreference.upsert({ where: { userId: account.id },
+          create: { userId: account.id, [field]: next }, update: { [field]: next } })
+        notice = next ? 'Уведомления включены' : 'Уведомления выключены'
+      }
+      const html = await getBotScreen(callback.from.id, 'settings', notice)
+      await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
+      return
+    }
+    if (action === 'renew:off') {
+      const html = buildAutoRenewalOffConfirm(await getBotScreenInput(callback.from.id, 'billing'))
+      await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
+      return
+    }
+    if (action === 'renew:offyes') {
+      const account = await prisma.user.findUnique({ where: { telegramId: BigInt(callback.from.id) }, select: { id: true } })
+      const disabled = account ? await disableAutoRenewal(account.id) : null
+      const notice = disabled ? 'Автопродление отключено. Подписка действует до конца оплаченного срока.' : 'Автопродление уже отключено'
+      const html = await getBotScreen(callback.from.id, 'billing', notice)
+      await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
+      return
+    }
+    if (action === 'sup:new') {
+      const input = await getBotScreenInput(callback.from.id, 'support')
+      const html = buildSupportCategoryScreen(input, supportCategories.map(category => ({ value: category.value, label: category.label, description: category.description })))
+      await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
+      return
+    }
+    if (action === 'sup:cancel') {
+      const account = await prisma.user.findUnique({ where: { telegramId: BigInt(callback.from.id) }, select: { id: true } })
+      if (account) await clearBotDialogState(account.id)
+      const html = await getBotScreen(callback.from.id, 'support', 'Ввод отменён')
+      await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
+      return
+    }
+    if (action.startsWith('supcat:')) {
+      const category = action.slice(7)
+      const account = await prisma.user.findUnique({ where: { telegramId: BigInt(callback.from.id) }, select: { id: true } })
+      if (account && isSupportCategory(category)) {
+        await setBotDialogState(account.id, `support:new:${category}`)
+        const label = supportCategories.find(item => item.value === category)?.label ?? 'Обращение'
+        const html = buildSupportPromptScreen(await getBotScreenInput(callback.from.id, 'support'),
+          { title: label, hint: 'Опишите вопрос: что случилось, на каком устройстве и когда. По вопросам оплаты укажите номер заказа.' })
+        await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
+        return
+      }
+      const html = await getBotScreen(callback.from.id, 'support', 'Сначала войдите в приложение через Telegram')
+      await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
+      return
+    }
+    if (action.startsWith('supt:')) {
+      const html = await getBotSupportThreadScreen(callback.from.id, action.slice(5))
+      await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
+      return
+    }
+    if (action.startsWith('supr:')) {
+      const ticketId = action.slice(5)
+      const account = await prisma.user.findUnique({ where: { telegramId: BigInt(callback.from.id) }, select: { id: true } })
+      const ticket = account ? await prisma.supportTicket.findFirst({ where: { id: ticketId, userId: account.id }, select: { subject: true, status: true } }) : null
+      if (account && ticket && ticket.status !== 'CLOSED') {
+        await setBotDialogState(account.id, `support:reply:${ticketId}`)
+        const html = buildSupportPromptScreen(await getBotScreenInput(callback.from.id, 'support'),
+          { title: ticket.subject, hint: 'Напишите ответ — он добавится в переписку и появится в кабинете.' })
+        await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
+        return
+      }
+      const html = await getBotScreen(callback.from.id, 'support', ticket ? 'Обращение уже закрыто. Создайте новое.' : 'Обращение не найдено')
+      await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
+      return
+    }
+    if (action.startsWith('supc:')) {
+      const account = await prisma.user.findUnique({ where: { telegramId: BigInt(callback.from.id) }, select: { id: true } })
+      const result = account ? await closeTicketFromBot(account.id, action.slice(5)) : { ok: false as const, error: 'Сначала войдите в приложение через Telegram' }
+      const html = await getBotScreen(callback.from.id, 'support', result.ok ? 'Обращение закрыто. История сохранилась в кабинете.' : result.error)
+      await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
+      return
+    }
     let screen: BotScreen = botScreens.includes(action as BotScreen) ? action as BotScreen : 'home'
     let notice: string | undefined
     if (action === 'claim') {
@@ -186,11 +292,24 @@ export async function handleMiniAppUpdate(update: z.infer<typeof telegramUpdateS
   }
   const message = update.message
   if (!message || message.chat.type !== 'private' || !message.from || message.chat.id !== message.from.id) return
+  const text = message.text?.trim() ?? ''
   const menu: Record<string, BotScreen> = {
     'Моя подписка': 'subscription', 'Мои устройства': 'devices', 'Пригласить друга': 'referrals', 'Поддержка': 'support',
     'Тарифы': 'plans', 'Платежи': 'billing', 'Бонусы': 'bonus', 'Уведомления': 'notifications', 'Настройки': 'settings',
   }
-  const menuScreen = menu[message.text || '']
+  const menuScreen = menu[text]
+  const isNavigation = Boolean(menuScreen) || text.startsWith('/')
+  // Кнопки меню и команды отменяют ожидаемый ввод, свободный текст уходит в него.
+  if (text && !isNavigation) {
+    const account = await prisma.user.findUnique({ where: { telegramId: BigInt(message.from.id) },
+      select: { id: true, botDialog: { select: { state: true } } } })
+    if (account?.botDialog) {
+      await handleBotDialogMessage(message.chat.id, account.id, account.botDialog.state, text)
+      return
+    }
+  } else if (isNavigation) {
+    await prisma.telegramBotDialog.deleteMany({ where: { user: { telegramId: BigInt(message.from.id) } } })
+  }
   if (menuScreen && process.env.TELEGRAM_RICH_MESSAGES_ENABLED === 'true') {
     await miniAppBotCall('sendRichMessage', { chat_id: message.chat.id, rich_message: { html: await getBotScreen(message.from.id, menuScreen) },
       protect_content: true, reply_markup: { remove_keyboard: true } })
@@ -225,6 +344,39 @@ export async function handleMiniAppUpdate(update: z.infer<typeof telegramUpdateS
 
 function checkoutUuid(callbackId: string) {
   return callbackUuid('avp-checkout', callbackId)
+}
+
+// Свободный текст в ожидаемом диалоге: новое обращение или ответ в тикет.
+// Состояние сохраняется при ошибках валидации, чтобы пользователь мог исправить текст.
+async function handleBotDialogMessage(chatId: number, userId: string, state: string, text: string) {
+  let notice: string
+  if (state.startsWith('support:new:')) {
+    const category = state.slice('support:new:'.length)
+    if (!isSupportCategory(category)) {
+      await clearBotDialogState(userId)
+      notice = 'Сессия обращения устарела. Начните заново.'
+    } else {
+      const result = await createTicketFromBot(userId, category, text)
+      if (result.ok) {
+        await clearBotDialogState(userId)
+        notice = 'Обращение отправлено. Ответ придёт в этот чат и в кабинет.'
+      } else notice = result.error
+    }
+  } else if (state.startsWith('support:reply:')) {
+    const result = await replyToTicketFromBot(userId, state.slice('support:reply:'.length), text)
+    if (result.ok) {
+      await clearBotDialogState(userId)
+      notice = 'Сообщение отправлено в поддержку.'
+    } else if (result.error.includes('закрыто') || result.error.includes('не найдено')) {
+      await clearBotDialogState(userId)
+      notice = result.error
+    } else notice = result.error
+  } else {
+    await clearBotDialogState(userId)
+    notice = 'Сессия устарела. Начните заново.'
+  }
+  const html = await getBotScreen(chatId, 'support', notice)
+  await miniAppBotCall('sendRichMessage', { chat_id: chatId, rich_message: { html }, protect_content: true })
 }
 
 function callbackUuid(salt: string, callbackId: string) {

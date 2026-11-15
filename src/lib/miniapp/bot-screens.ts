@@ -1,11 +1,11 @@
 import { prisma } from '@/lib/prisma'
 import { getMiniAppOverview } from './overview'
-import { buildRichScreen, buildRichPaymentScreen, type BotScreen, type RichScreenInput } from './rich-screens'
+import { buildRichScreen, buildRichPaymentScreen, buildSupportThreadScreen, type BotScreen, type BotThreadMessage, type RichScreenInput } from './rich-screens'
 import { miniAppUrl } from './config'
 import { channelCampaign } from './channel-referrals'
 import { ensureUserReferralCode } from '@/lib/referrals'
 import { syncLocalDevicesFromRemnawave } from '@/lib/remnawave-device-sync'
-import { hasRemnawaveUserReference, remnawaveUserReference } from '@/lib/remnawave'
+import { hasRemnawaveUserReference, remnawave, remnawaveUserReference } from '@/lib/remnawave'
 import { isYookassaConfigured } from '@/lib/yookassa'
 import { getFeatureFlags } from '@/lib/feature-flags'
 
@@ -14,6 +14,7 @@ const autoRenewalLabel: Record<string, string> = {
   AWAITING_PAYMENT_METHOD: 'ждёт привязки карты', ACTIVE: 'включено', PROCESSING: 'списание в обработке',
   RETRYING: 'повторная попытка списания', PAUSED: 'на паузе', DISABLED: 'отключено',
 }
+const ticketStatusLabel = (status: string) => status === 'WAITING_USER' ? 'Есть ответ' : status === 'CLOSED' ? 'Закрыто' : 'Ждём ответа поддержки'
 const formatRub = (kopecks: number) => `${(kopecks / 100).toLocaleString('ru-RU')} ₽`
 const formatDate = (date: Date) => date.toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow' })
 
@@ -32,6 +33,13 @@ export async function getBotScreenInput(telegramId: number, screen: BotScreen, n
       const devices = await prisma.device.findMany({ where: { userId: user.id }, orderBy: { lastSeenAt: 'desc' }, take: 8,
         select: { id: true, displayName: true, platform: true } })
       input.devices = devices.map(device => ({ id: device.id, title: device.displayName || 'Устройство', platform: device.platform || 'VPN-клиент' }))
+    }
+    if (screen === 'connect' && user.remnawaveUsername) {
+      try {
+        const info = await remnawave.getSubscriptionByUsername(user.remnawaveUsername)
+        const url = info.response.subscriptionUrl
+        if (typeof url === 'string' && /^https:\/\//.test(url)) input.connectUrl = url
+      } catch { input.connectUrl = null }
     }
     if (screen === 'referrals' && input.overview.referrals) {
       const campaign = channelCampaign()
@@ -56,6 +64,7 @@ export async function getBotScreenInput(telegramId: number, screen: BotScreen, n
       input.autoRenewal = autoRenewal
         ? `${autoRenewalLabel[autoRenewal.status] ?? autoRenewal.status.toLowerCase()}${autoRenewal.status === 'ACTIVE' && autoRenewal.paymentMethodTitle ? ` · ${autoRenewal.paymentMethodTitle}` : ''}`
         : null
+      input.autoRenewalActive = autoRenewal?.status === 'ACTIVE' || autoRenewal?.status === 'PROCESSING' || autoRenewal?.status === 'RETRYING' || autoRenewal?.status === 'PAUSED'
     }
     if (screen === 'bonus') {
       const features = await getFeatureFlags()
@@ -63,6 +72,7 @@ export async function getBotScreenInput(telegramId: number, screen: BotScreen, n
         ? await prisma.bonusBoxAttempt.count({ where: { userId: user.id, usedAt: null, OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] } })
         : 0
       input.bonus = { enabled: features.bonusBox, attempts }
+      input.promoCodes = await getBotPromoCodes(user.id)
     }
     if (screen === 'notifications') {
       const [unread, items] = await Promise.all([
@@ -88,14 +98,37 @@ export async function getBotScreenInput(telegramId: number, screen: BotScreen, n
     }
     if (screen === 'support' && input.overview.support) {
       const tickets = await prisma.supportTicket.findMany({ where: { userId: user.id, status: { not: 'CLOSED' } }, orderBy: { lastMessageAt: 'desc' }, take: 5,
-        select: { subject: true, status: true } })
-      input.tickets = tickets.map(ticket => ({ subject: ticket.subject, status: ticket.status === 'WAITING_USER' ? 'Есть ответ' : 'Ждём ответа поддержки' }))
+        select: { id: true, subject: true, status: true } })
+      input.tickets = tickets.map(ticket => ({ id: ticket.id, subject: ticket.subject, status: ticketStatusLabel(ticket.status) }))
     }
     if ((screen === 'referrals' && !input.overview.referrals) || (screen === 'support' && !input.overview.support) || (screen === 'admin' && !input.admin)) {
       input.screen = 'home'; input.notice = 'Раздел сейчас недоступен'
     }
   }
   return input
+}
+
+// Промокоды, выданные пользователю и ещё не использованные им.
+async function getBotPromoCodes(userId: string) {
+  const [openings, welcomes, merges] = await Promise.all([
+    prisma.bonusBoxOpening.findMany({ where: { userId, promoCodeId: { not: null } },
+      select: { promoCode: { select: { code: true } } }, orderBy: { createdAt: 'desc' }, take: 20 }),
+    prisma.welcomeBonusRedemption.findMany({ where: { userId, promoCodeId: { not: null } },
+      select: { promoCode: { select: { code: true } } }, orderBy: { createdAt: 'desc' }, take: 20 }),
+    prisma.promoCodeMerge.findMany({ where: { userId },
+      select: { resultPromo: { select: { code: true } } }, orderBy: { createdAt: 'desc' }, take: 20 }),
+  ])
+  const codes = [...new Set([...merges.map(item => item.resultPromo.code), ...openings.map(item => item.promoCode?.code), ...welcomes.map(item => item.promoCode?.code)]
+    .filter((code): code is string => Boolean(code)))]
+  if (!codes.length) return []
+  const [active, redeemed] = await Promise.all([
+    prisma.promoCode.findMany({ where: { code: { in: codes }, isActive: true, OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] },
+      select: { code: true, discountPercent: true, expiresAt: true } }),
+    prisma.promoCodeRedemption.findMany({ where: { userId, promoCode: { code: { in: codes } } }, select: { promoCode: { select: { code: true } } } }),
+  ])
+  const used = new Set(redeemed.map(item => item.promoCode.code))
+  return active.filter(promo => !used.has(promo.code)).slice(0, 5)
+    .map(promo => ({ code: promo.code, discountPercent: promo.discountPercent, expiresAt: promo.expiresAt?.toISOString() ?? null }))
 }
 
 export async function getBotScreen(telegramId: number, screen: BotScreen, notice?: string, referralCode?: string) {
@@ -107,4 +140,25 @@ export async function getBotPaymentScreen(telegramId: number, planId: string) {
     getBotScreenInput(telegramId, 'plans'), isYookassaConfigured(),
   ])
   return buildRichPaymentScreen(input, planId, yookassaAvailable)
+}
+
+// Переписка по обращению для экрана бота. Помечает тикет прочитанным пользователю.
+export async function getBotSupportThreadScreen(telegramId: number, ticketId: string) {
+  const input = await getBotScreenInput(telegramId, 'support')
+  const account = await prisma.user.findUnique({ where: { telegramId: BigInt(telegramId) }, select: { id: true } })
+  const ticket = account ? await prisma.supportTicket.findFirst({
+    where: { id: ticketId, userId: account.id },
+    select: { id: true, subject: true, status: true, updatedAt: true,
+      messages: { orderBy: { createdAt: 'desc' }, take: 6, select: { body: true, senderRole: true, createdAt: true } } },
+  }) : null
+  if (!ticket) return getBotScreen(telegramId, 'support', 'Обращение не найдено')
+  if (ticket.status !== 'CLOSED') {
+    await prisma.supportTicket.updateMany({ where: { id: ticket.id, userUnreadCount: { gt: 0 } }, data: { userUnreadCount: 0 } })
+  }
+  const messages: BotThreadMessage[] = ticket.messages.reverse().map(message => ({
+    from: message.senderRole === 'USER' ? 'user' : 'admin',
+    body: message.body.length > 500 ? `${message.body.slice(0, 500)}…` : message.body,
+    date: formatDate(message.createdAt),
+  }))
+  return buildSupportThreadScreen(input, { id: ticket.id, subject: ticket.subject, status: ticketStatusLabel(ticket.status), messages })
 }

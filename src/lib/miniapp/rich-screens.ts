@@ -6,6 +6,9 @@ export type BotScreen = 'home' | 'subscription' | 'plans' | 'billing' | 'devices
 export const botScreens: BotScreen[] = ['home', 'subscription', 'plans', 'billing', 'devices', 'bonus', 'notifications', 'referrals', 'support', 'connect', 'settings', 'admin']
 export type BotDevice = { id: string; title: string; platform: string }
 export type BotSpinResult = { prizeTitle: string; prizeDescription: string | null; promoCode: string | null; promoCodeExpiresAt: string | null; remainingAttempts: number }
+export type BotTicket = { id: string; subject: string; status: string }
+export type BotThreadMessage = { from: 'user' | 'admin'; body: string; date: string }
+export type BotPromoCode = { code: string; discountPercent: number; expiresAt: string | null }
 export type RichScreenInput = {
   screen: BotScreen
   overview: MiniAppOverview | null
@@ -13,10 +16,13 @@ export type RichScreenInput = {
   bannerUrl?: string
   referral?: { url: string; condition: string; invited: number; claimed: number; channelUrl: string | null; eligible: boolean; ownClaimed: boolean }
   devices?: BotDevice[]
-  tickets?: Array<{ subject: string; status: string }>
+  tickets?: BotTicket[]
   payments?: Array<{ title: string; amount: string; status: string; date: string }>
   autoRenewal?: string | null
+  autoRenewalActive?: boolean
   bonus?: { enabled: boolean; attempts: number }
+  promoCodes?: BotPromoCode[]
+  connectUrl?: string | null
   inbox?: { unread: number; items: Array<{ title: string; date: string; fresh: boolean }> }
   prefs?: { telegram: boolean; email: boolean; broadcasts: boolean }
   adminStats?: { users: number; activeSubscriptions: number; paymentsToday: number; openTickets: number }
@@ -30,6 +36,8 @@ const titles: Record<BotScreen, string> = {
 }
 const cb = (label: string, screen: string, style = 'primary') => `<tg-button type="callback_data" style="${style}" data="avp:${escape(screen)}">${escape(label)}</tg-button>`
 const row = (...buttons: string[]) => `<tg-button-row>${buttons.join('')}</tg-button-row>`
+const copyBtn = (label: string, text: string) => `<tg-button type="copy_text" text="${escape(text)}">${escape(label)}</tg-button>`
+const urlBtn = (label: string, url: string) => `<tg-button type="url" style="primary" url="${escape(url)}">${escape(label)}</tg-button>`
 const table = (rows: string[][]) => `<table bordered compact>${rows.map(cells => `<tr>${cells.map(cell => `<td>${escape(cell)}</td>`).join('')}</tr>`).join('')}</table>`
 const brandHeader = (bannerUrl?: string) => bannerUrl && /^https:\/\//.test(bannerUrl) ? `<img src="${escape(bannerUrl)}">` : '<h2>AlekseevVP</h2>'
 const deviceEmoji = (platform: string) => {
@@ -40,6 +48,7 @@ const deviceEmoji = (platform: string) => {
   return '📟'
 }
 const statusDot = (sub: MiniAppOverview['subscription'] | null | undefined) => !sub ? '⚪' : sub.usable ? '🟢' : '🔴'
+const footer = (screen: string) => `<hr>${row(cb('🏠 На главную', 'home'), cb('🔄 Обновить', screen, 'link'))}`
 
 // Pure renderer: no personal key, password, initData or panel token can enter its DTO.
 export function buildRichScreen(input: RichScreenInput) {
@@ -80,16 +89,16 @@ export function buildRichScreen(input: RichScreenInput) {
         ['🌐 Трафик', plan.trafficLimitGb == null ? 'Без ограничения' : `${plan.trafficLimitGb} ГБ`],
       ]), `<p>${plan.isPromo ? '🎁 Бесплатно' : `💰 ${escape(formatPrice(plan.priceKopecks))}`}</p>`,
       row(cb(plan.isPromo ? '🎁 Получить доступ' : plan.current ? '🔄 Продлить тариф' : '💳 Оформить тариф', plan.isPromo ? `buy:${plan.id}` : `pay:${plan.id}`, 'success')))
-      parts.push('<hr><p>Продление того же тарифа добавляет дни. При смене тарифа начинается новый срок: остаток прежнего не переносится.</p>', row(app('💎 Сравнить в приложении', 'plans')))
+      parts.push('<hr><p>Продление того же тарифа добавляет дни. При смене тарифа начинается новый срок: остаток прежнего не переносится.</p>')
       break
     case 'billing': {
       parts.push(`<h4>${statusDot(sub)} ${escape(sub?.title || 'Подписка пока не оформлена')}</h4>`)
       if (input.autoRenewal) parts.push(`<p>🔁 Автопродление: ${escape(input.autoRenewal)}</p>`)
       if (currentPlan) parts.push(row(cb(`🔄 Продлить · ${formatPrice(currentPlan.priceKopecks)}`, `pay:${currentPlan.id}`, 'success')))
+      if (input.autoRenewalActive) parts.push(row(cb('⏸ Отключить автопродление', 'renew:off')))
       if (!input.payments?.length) parts.push('<p>Оплат пока не было. История появится после первой покупки.</p>')
       if (input.payments?.length) parts.push('<h4>🧾 Последние операции</h4>',
         table(input.payments.map(payment => [`${payment.date} · ${payment.title}`, `${payment.amount} · ${payment.status}`])))
-      parts.push(row(app('💳 История и автопродление', 'billing')))
       break
     }
     case 'devices': {
@@ -105,13 +114,21 @@ export function buildRichScreen(input: RichScreenInput) {
       parts.push(row(cb('➕ Добавить устройство', 'connect', 'success')))
       break
     }
-    case 'connect':
-      parts.push('<h4>1️⃣ Выберите приложение</h4>', table([['iPhone / Mac', 'Rabbit Hole'], ['Android', 'INCY'], ['Windows', 'HAPP']]),
-        '<h4>2️⃣ Добавьте подписку</h4><p>Откройте персональную ссылку в приложении кабинета.</p>',
-        '<h4>3️⃣ Включите VPN</h4><p>После импорта нажмите «Подключить» в VPN-клиенте.</p>',
-        row(app('🔌 Открыть настройку', 'connect')),
-        '<p>Персональная ссылка доступна только после входа. Бот не показывает состояние VPN-туннеля.</p>')
+    case 'connect': {
+      parts.push('<h4>1️⃣ Скопируйте ссылку подписки</h4>')
+      if (input.connectUrl) {
+        parts.push(row(copyBtn('📋 Скопировать ссылку подписки', input.connectUrl)),
+          '<p>Ссылка персональная — не пересылайте её и не публикуйте: по ней любой получит ваш доступ.</p>')
+      } else if (sub?.usable) {
+        parts.push('<p>Не удалось получить ссылку. Нажмите «Обновить» или попробуйте позже.</p>')
+      } else {
+        parts.push('<p>Ссылка появится после оформления подписки.</p>', row(cb('💎 Выбрать тариф', 'plans', 'success')))
+      }
+      parts.push('<h4>2️⃣ Добавьте её в приложение</h4>', table([['iPhone / Mac', 'Rabbit Hole'], ['Android', 'INCY'], ['Windows', 'HAPP']]),
+        '<p>В приложении выберите «Добавить подписку» и вставьте ссылку из буфера обмена.</p>',
+        '<h4>3️⃣ Включите VPN</h4><p>После импорта нажмите «Подключить» в VPN-клиенте.</p>')
       break
+    }
     case 'bonus': {
       if (input.bonus && !input.bonus.enabled) {
         parts.push('<p>Бонусная программа сейчас отключена. Загляните позже.</p>')
@@ -122,8 +139,14 @@ export function buildRichScreen(input: RichScreenInput) {
         ? `<p>Доступно попыток: <b>${attempts}</b>. Приз начисляется сразу, не закрывая чат.</p>`
         : '<p>Новые попытки появляются за задания, покупки и приглашения друзей.</p>')
       if (attempts > 0) parts.push(row(cb(`🎡 Крутить колесо · ${attempts}`, 'spin', 'success')))
+      if (input.promoCodes?.length) {
+        parts.push('<h4>🏷 Ваши промокоды</h4>',
+          table(input.promoCodes.map(promo => [`${promo.code} · −${promo.discountPercent}%`,
+            promo.expiresAt ? `до ${new Date(promo.expiresAt).toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow' })}` : 'без срока'])),
+          '<p>Промокод применяется при оплате тарифа — выберите его на экране оплаты.</p>')
+        for (const promo of input.promoCodes.slice(0, 3)) parts.push(row(copyBtn(`📋 Скопировать ${promo.code}`, promo.code)))
+      }
       if (data.referrals) parts.push(row(cb('🤝 Пригласить друга', 'referrals')))
-      parts.push(row(app('🎁 Задания и призы', 'bonus')))
       break
     }
     case 'notifications': {
@@ -139,28 +162,40 @@ export function buildRichScreen(input: RichScreenInput) {
       parts.push('<h4>🤝 Бонус за друга</h4>', `<p>${escape(r?.condition || 'Программа бонусов за вступление в канал готовится.')}</p>`)
       if (r) {
         parts.push(table([['👥 Приглашено', String(r.invited)], ['🎁 Бонусов подтверждено', String(r.claimed)]]),
-          row(`<tg-button type="copy_text" text="${escape(r.url)}">📋 Скопировать ссылку</tg-button>`))
-        if (r.channelUrl) parts.push(row(`<tg-button type="url" style="primary" url="${escape(r.channelUrl)}">📢 Вступить в канал</tg-button>`))
+          row(copyBtn('📋 Скопировать ссылку', r.url)))
+        if (r.channelUrl) parts.push(row(urlBtn('📢 Вступить в канал', r.channelUrl)))
         if (r.eligible && !r.ownClaimed) parts.push(row(cb('✅ Я вступил, проверить', 'claim', 'success')))
         if (r.ownClaimed) parts.push('<p>Бонус подтверждён. Начисление выполняется через общую очередь кабинета.</p>')
       }
       break
     }
-    case 'support':
-      parts.push('<p>Напишите нам в кабинете. История диалогов сохранится в вашем аккаунте.</p>')
+    case 'support': {
+      parts.push('<p>Отвечаем прямо здесь, в чате. История обращений сохраняется и в кабинете.</p>')
       if (!input.tickets?.length) parts.push('<p>Открытых обращений нет.</p>')
-      if (input.tickets?.length) parts.push('<h4>📨 Открытые обращения</h4>', table(input.tickets.map(ticket => [ticket.subject, ticket.status])))
-      parts.push('<p>По вопросам оплаты укажите номер заказа.</p>', row(app('🛟 Открыть поддержку', 'support')))
+      if (input.tickets?.length) {
+        parts.push('<h4>📨 Открытые обращения</h4>', table(input.tickets.map(ticket => [ticket.subject, ticket.status])))
+        for (const ticket of input.tickets.slice(0, 5)) {
+          parts.push(row(cb(`💬 ${ticket.subject.slice(0, 22)} · ${ticket.status}`, `supt:${ticket.id}`)))
+        }
+      }
+      parts.push(row(cb('✍️ Написать в поддержку', 'sup:new', 'success')),
+        '<p>По вопросам оплаты укажите номер заказа.</p>')
       break
-    case 'settings':
-      parts.push('<p>Профиль, безопасность и каналы уведомлений.</p>')
-      if (input.prefs) parts.push(table([
-        ['✈️ Telegram', input.prefs.telegram ? '✅ Включены' : '⛔️ Выключены'],
-        ['📧 Email', input.prefs.email ? '✅ Включены' : '⛔️ Выключены'],
-        ['📢 Рассылки', input.prefs.broadcasts ? '✅ Включены' : '⛔️ Выключены'],
-      ]))
-      parts.push(row(app('⚙️ Открыть настройки', 'settings')))
+    }
+    case 'settings': {
+      parts.push('<p>Каналы уведомлений. Нажмите, чтобы переключить — настройка сразу действует и в кабинете.</p>')
+      if (input.prefs) {
+        const toggle = (label: string, key: string, enabled: boolean) => cb(`${enabled ? '✅' : '⛔️'} ${label}`, `set:${key}`, enabled ? 'success' : 'primary')
+        parts.push(table([
+          ['✈️ Telegram', input.prefs.telegram ? 'Включены' : 'Выключены'],
+          ['📧 Email', input.prefs.email ? 'Включены' : 'Выключены'],
+          ['📢 Рассылки', input.prefs.broadcasts ? 'Включены' : 'Выключены'],
+        ]),
+        row(toggle('Telegram', 'telegram', input.prefs.telegram), toggle('Email', 'email', input.prefs.email)),
+        row(toggle('Рассылки', 'broadcasts', input.prefs.broadcasts)))
+      }
       break
+    }
     case 'admin':
       if (input.admin) {
         if (input.adminStats) parts.push(table([
@@ -177,7 +212,7 @@ export function buildRichScreen(input: RichScreenInput) {
     const extraButtons = [...(data.referrals ? [cb('🤝 Пригласить друга', 'referrals')] : []), ...(data.support ? [cb('🛟 Поддержка', 'support')] : []), cb('⚙️ Настройки', 'settings'), ...(input.admin ? [cb('🛠 Админка', 'admin')] : [])]
     if (extraButtons.length) parts.push(row(...extraButtons))
   }
-  parts.push('<hr>', row(cb('🏠 На главную', 'home'), cb('🔄 Обновить', input.screen, 'link')))
+  parts.push(footer(input.screen))
   return parts.join('')
 }
 
@@ -210,11 +245,58 @@ export function buildSpinResultScreen(input: RichScreenInput, spin: BotSpinResul
   if (spin.prizeDescription) parts.push(`<p>${escape(spin.prizeDescription)}</p>`)
   if (spin.promoCode) {
     parts.push(table([['Промокод', spin.promoCode], ...(spin.promoCodeExpiresAt ? [['Действует до', new Date(spin.promoCodeExpiresAt).toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow' })]] as string[][] : [])]),
-      row(`<tg-button type="copy_text" text="${escape(spin.promoCode)}">📋 Скопировать промокод</tg-button>`))
+      row(copyBtn('📋 Скопировать промокод', spin.promoCode)))
   }
   parts.push(`<p>Осталось попыток: ${spin.remainingAttempts}.</p>`)
   if (spin.remainingAttempts > 0) parts.push(row(cb(`🎡 Крутить ещё · ${spin.remainingAttempts}`, 'spin', 'success')))
-  parts.push(row(cb('🎁 К бонусам', 'bonus')), '<hr>', row(cb('🏠 На главную', 'home'), cb('🔄 Обновить', 'bonus', 'link')))
+  parts.push(row(cb('🎁 К бонусам', 'bonus')), footer('bonus'))
+  return parts.join('')
+}
+
+// Выбор темы обращения перед вводом текста.
+export function buildSupportCategoryScreen(input: RichScreenInput, categories: Array<{ value: string; label: string; description: string }>) {
+  const parts = [brandHeader(input.bannerUrl), '<h3>🛟 Новое обращение</h3>',
+    '<p>Выберите тему — так обращение быстрее попадёт к нужному специалисту.</p>']
+  for (const category of categories) {
+    parts.push(row(cb(category.label, `supcat:${category.value}`)))
+  }
+  parts.push(row(cb('◀️ Отмена', 'support')))
+  return parts.join('')
+}
+
+// Ожидание текста обращения: следующее сообщение пользователя уйдёт в поддержку.
+export function buildSupportPromptScreen(input: RichScreenInput, prompt: { title: string; hint: string }) {
+  const parts = [brandHeader(input.bannerUrl), `<h3>✍️ ${escape(prompt.title)}</h3>`,
+    `<p>${escape(prompt.hint)}</p>`,
+    '<p>Просто отправьте следующее сообщение в этот чат — оно попадёт в поддержку и в ваш кабинет.</p>',
+    row(cb('◀️ Отмена', 'sup:cancel'))]
+  return parts.join('')
+}
+
+// Диалог с поддержкой внутри бота: последние сообщения и действия с тикетом.
+export function buildSupportThreadScreen(input: RichScreenInput, thread: { id: string; subject: string; status: string; messages: BotThreadMessage[] }) {
+  const parts = [brandHeader(input.bannerUrl), '<h3>🛟 Обращение</h3>',
+    `<h4>${escape(thread.subject)}</h4>`,
+    table([['Статус', thread.status]])]
+  if (!thread.messages.length) parts.push('<p>Сообщений пока нет.</p>')
+  if (thread.messages.length) {
+    parts.push('<h4>💬 Переписка</h4>')
+    for (const message of thread.messages) {
+      parts.push(`<p>${message.from === 'admin' ? '🛟 Поддержка' : 'Вы'} · ${escape(message.date)}<br>${escape(message.body)}</p>`)
+    }
+  }
+  parts.push(row(cb('✍️ Ответить', `supr:${thread.id}`, 'success')))
+  parts.push(row(cb('✅ Закрыть обращение', `supc:${thread.id}`)))
+  parts.push(row(cb('◀️ К обращениям', 'support')))
+  return parts.join('')
+}
+
+// Подтверждение отключения автопродления.
+export function buildAutoRenewalOffConfirm(input: RichScreenInput) {
+  const parts = [brandHeader(input.bannerUrl), '<h3>⏸ Отключить автопродление?</h3>',
+    '<p>Автоматическое списание прекратится. Подписка будет действовать до конца оплаченного срока — продлить её можно в любой момент вручную.</p>',
+    row(cb('✅ Да, отключить', 'renew:offyes', 'success')),
+    row(cb('◀️ Отмена', 'billing'))]
   return parts.join('')
 }
 

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { buildDeviceDeleteConfirm, buildDeviceScreen, buildRichPaymentScreen, buildRichScreen, buildSpinResultScreen } from './rich-screens'
+import { buildAutoRenewalOffConfirm, buildDeviceDeleteConfirm, buildDeviceScreen, buildRichPaymentScreen, buildRichScreen, buildSpinResultScreen, buildSupportCategoryScreen, buildSupportPromptScreen, buildSupportThreadScreen } from './rich-screens'
 import { channelCampaign, isChannelMember, isChannelReference } from './channel-referrals'
 import { miniAppDemo } from './model'
 import { isMiniAppOwnedUpdate, isPaymentUpdate, isUnsupportedPaymentUpdate, isUnsupportedCallback, telegramUpdateSchema, validWebhookSecret } from './bot'
@@ -88,11 +88,12 @@ describe('Telegram Mini App boundaries', () => {
       expect(isMiniAppOwnedUpdate({ message: { text: command } })).toBe(true)
     }
     const billing = buildRichScreen({ screen: 'billing', overview: miniAppDemo, appUrl: 'https://cabinet.example.test/miniapp',
-      autoRenewal: 'включено · MIR **1234',
+      autoRenewal: 'включено · MIR **1234', autoRenewalActive: true,
       payments: [{ title: 'AlekseevVP', amount: '299 ₽', status: 'Оплачен', date: '01.11.2026' }] })
     expect(billing).toContain('Автопродление: включено · MIR **1234')
     expect(billing).toContain('299 ₽ · Оплачен')
-    expect(billing).toContain('tab=billing')
+    expect(billing).toContain('avp:renew:off')
+    expect(billing).not.toContain('type="web_app"')
     const bonus = buildRichScreen({ screen: 'bonus', overview: miniAppDemo, appUrl: 'https://cabinet.example.test/miniapp',
       bonus: { enabled: true, attempts: 2 } })
     expect(bonus).toContain('Доступно попыток: <b>2</b>')
@@ -106,6 +107,46 @@ describe('Telegram Mini App boundaries', () => {
       prefs: { telegram: true, email: false, broadcasts: true } })
     expect(prefs).toContain('Включены')
     expect(prefs).toContain('Выключены')
+    expect(prefs).toContain('avp:set:telegram')
+    expect(prefs).toContain('avp:set:email')
+    expect(prefs).toContain('avp:set:broadcasts')
+    expect(prefs).not.toContain('type="web_app"')
+  })
+  it('runs support, settings and connection flows without leaving the chat', () => {
+    const appUrl = 'https://cabinet.example.test/miniapp'
+    const support = buildRichScreen({ screen: 'support', overview: miniAppDemo, appUrl,
+      tickets: [{ id: 'ticket-1', subject: 'Проблема с подключением', status: 'Есть ответ' }] })
+    expect(support).toContain('avp:sup:new')
+    expect(support).toContain('avp:supt:ticket-1')
+    expect(support).not.toContain('type="web_app"')
+    const categories = buildSupportCategoryScreen({ screen: 'support', overview: miniAppDemo, appUrl },
+      [{ value: 'payment', label: 'Оплата', description: 'Платёж' }])
+    expect(categories).toContain('avp:supcat:payment')
+    const prompt = buildSupportPromptScreen({ screen: 'support', overview: miniAppDemo, appUrl },
+      { title: 'Оплата', hint: 'Опишите вопрос' })
+    expect(prompt).toContain('следующее сообщение')
+    expect(prompt).toContain('avp:sup:cancel')
+    const thread = buildSupportThreadScreen({ screen: 'support', overview: miniAppDemo, appUrl },
+      { id: 'ticket-1', subject: 'Проблема с подключением', status: 'Есть ответ',
+        messages: [{ from: 'admin', body: 'Попробуйте переподключиться', date: '01.11.2026' }] })
+    expect(thread).toContain('🛟 Поддержка')
+    expect(thread).toContain('avp:supr:ticket-1')
+    expect(thread).toContain('avp:supc:ticket-1')
+    const connect = buildRichScreen({ screen: 'connect', overview: miniAppDemo, appUrl,
+      connectUrl: 'https://panel.example.test/sub/abc123' })
+    expect(connect).toContain('type="copy_text"')
+    expect(connect).toContain('https://panel.example.test/sub/abc123')
+    expect(connect).not.toContain('type="web_app"')
+    const connectNoKey = buildRichScreen({ screen: 'connect', overview: { ...miniAppDemo, subscription: null }, appUrl })
+    expect(connectNoKey).toContain('avp:plans')
+    const confirm = buildAutoRenewalOffConfirm({ screen: 'billing', overview: miniAppDemo, appUrl })
+    expect(confirm).toContain('avp:renew:offyes')
+    const promo = buildRichScreen({ screen: 'bonus', overview: miniAppDemo, appUrl,
+      bonus: { enabled: true, attempts: 0 }, promoCodes: [{ code: 'SALE10', discountPercent: 10, expiresAt: null }] })
+    expect(promo).toContain('SALE10')
+    expect(promo).toContain('type="copy_text"')
+    const plans = buildRichScreen({ screen: 'plans', overview: miniAppDemo, appUrl })
+    expect(plans).not.toContain('type="web_app"')
   })
   it('shows service stats only to admins', () => {
     const html = buildRichScreen({ screen: 'admin', overview: miniAppDemo, appUrl: 'https://cabinet.example.test/miniapp',

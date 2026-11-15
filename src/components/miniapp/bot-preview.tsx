@@ -14,7 +14,7 @@ export function BotPreview() {
   const [notice, setNotice] = useState('')
   const input = { screen, overview: miniAppDemo, appUrl: 'https://cabinet.alekseevvp.site/miniapp',
     devices: [demoDevice, { id: 'demo-dev-2', title: 'MacBook', platform: 'macOS · Rabbit Hole' }],
-    tickets: [{ subject: 'Подключение на iPhone', status: 'Есть ответ' }],
+    tickets: [{ id: 'demo-ticket-1', subject: 'Подключение на iPhone', status: 'Есть ответ' }],
     payments: [{ title: 'AlekseevVP', amount: '299 ₽', status: 'Оплачен', date: '01.11.2026' }, { title: 'AlekseevVP', amount: '299 ₽', status: 'Оплачен', date: '01.10.2026' }],
     autoRenewal: 'включено · MIR **1234',
     bonus: { enabled: true, attempts: 2 },

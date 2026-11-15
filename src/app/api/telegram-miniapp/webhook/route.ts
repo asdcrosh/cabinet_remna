@@ -1,6 +1,6 @@
 import { jsonResponse } from '@/lib/json-response'
 import { miniAppEnabled } from '@/lib/miniapp/config'
-import { handleMiniAppUpdate, isMiniAppOwnedUpdate, telegramUpdateSchema, validWebhookSecret } from '@/lib/miniapp/bot'
+import { handleMiniAppUpdate, isMiniAppOwnedUpdate, isPendingBotDialogUpdate, telegramUpdateSchema, validWebhookSecret } from '@/lib/miniapp/bot'
 import { forwardLegacyTelegramUpdate } from '@/lib/miniapp/legacy-forward'
 
 export const runtime = 'nodejs'
@@ -27,10 +27,16 @@ export async function POST(req: Request) {
   let value: unknown
   try { value = JSON.parse(raw) } catch { return jsonResponse({ error: 'Invalid JSON' }, { status: 400 }) }
   if (!isMiniAppOwnedUpdate(value)) {
-    try {
-      if (await forwardLegacyTelegramUpdate(raw)) return jsonResponse({ ok: true, forwarded: true })
-    } catch { /* Telegram retries if the legacy dispatcher is unavailable. */ }
-    return jsonResponse({ error: 'Legacy handler unavailable' }, { status: 503 })
+    // Свободный текст с ожидающим диалогом (например, сообщение в поддержку)
+    // обрабатывает новый бот, а не старый.
+    let pendingDialog = false
+    try { pendingDialog = await isPendingBotDialogUpdate(value) } catch { pendingDialog = false }
+    if (!pendingDialog) {
+      try {
+        if (await forwardLegacyTelegramUpdate(raw)) return jsonResponse({ ok: true, forwarded: true })
+      } catch { /* Telegram retries if the legacy dispatcher is unavailable. */ }
+      return jsonResponse({ error: 'Legacy handler unavailable' }, { status: 503 })
+    }
   }
   const parsed = telegramUpdateSchema.safeParse(value)
   if (!parsed.success) return jsonResponse({ error: 'Invalid update' }, { status: 400 })

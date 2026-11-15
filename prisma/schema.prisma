@@ -160,6 +160,7 @@ model User {
   subscriptionHealth         SubscriptionHealth?
   autoRenewal                AutoRenewal?
   retentionEvents            SubscriptionRetention[]
+  botDialog                  TelegramBotDialog?
 
   @@index([email])
   @@index([role])
@@ -2038,4 +2039,16 @@ model TelegramChannelReferral {
   referrerPaymentId String? @unique
   referredPaymentId String? @unique
   @@index([referrerId, claimedAt])
+}
+
+
+/// Состояние диалога с ботом: какой ввод ждём следующим сообщением
+/// (например, текст нового обращения в поддержку).
+model TelegramBotDialog {
+  userId    String   @id
+  state     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
