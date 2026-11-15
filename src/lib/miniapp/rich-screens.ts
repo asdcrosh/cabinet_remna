@@ -249,7 +249,8 @@ export function buildRichScreen(input: RichScreenInput) {
   }
   if (input.screen === 'home') {
     const extraButtons = [...(data.referrals ? [cb('🤝 Пригласить друга', 'referrals')] : []), ...(data.support ? [cb('🛟 Поддержка', 'support')] : []), cb('⚙️ Настройки', 'settings'), ...(input.admin ? [cb('🛠 Админка', 'admin')] : [])]
-    if (extraButtons.length) parts.push(row(...extraButtons))
+    // Больше двух кнопок в ряд не ставим: Telegram обрезает подписи многоточием.
+    for (let i = 0; i < extraButtons.length; i += 2) parts.push(row(...extraButtons.slice(i, i + 2)))
   }
   parts.push(footer(input.screen))
   return parts.join('')
