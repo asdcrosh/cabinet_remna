@@ -12,7 +12,7 @@ vi.mock('./stars-payments', () => ({ answerStarsPreCheckout: vi.fn(), isOurStars
   refundStarsPayment: vi.fn(), settleStarsPayment: vi.fn() }))
 vi.mock('./bot-screens', () => ({ getBotScreen: vi.fn(), getBotPaymentScreen: mocks.paymentScreen }))
 vi.mock('./rich-screens', () => ({ botScreens: [] }))
-vi.mock('./channel-referrals', () => ({ claimChannelReward: vi.fn() }))
+vi.mock('./channel-referrals', () => ({ claimChannelReward: vi.fn(), channelGate: vi.fn(async () => null) }))
 vi.mock('@/lib/prisma', () => ({ prisma: { user: { findUnique: mocks.findUser } } }))
 vi.mock('@/lib/plan-catalog', () => ({ buildPlanCatalog: mocks.catalog }))
 vi.mock('@/lib/rate-limit', () => ({ rateLimitKey: mocks.limitKey }))

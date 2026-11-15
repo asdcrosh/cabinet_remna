@@ -4,9 +4,9 @@ import { miniAppUrl } from './config'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { getBotAdminThreadScreen, getBotAdminTicketsScreen, getBotBroadcastThemesScreen, getBotPaymentScreen, getBotPlansPromoScreen, getBotScreen, getBotScreenInput, getBotSupportThreadScreen, validateBotPromoCode } from './bot-screens'
-import { botScreens, buildAdminAssignScreen, buildAdminTemplatesScreen, buildAutoRenewalOffConfirm, buildBroadcastPreviewScreen, buildBroadcastPromptScreen, buildBroadcastSentScreen, buildDeviceDeleteConfirm, buildDeviceScreen, buildSpinResultScreen, buildSupportCategoryScreen, buildSupportPromptScreen, buildWhatsNewScreen, type BotScreen } from './rich-screens'
+import { botScreens, buildAdminAssignScreen, buildAdminTemplatesScreen, buildAutoRenewalOffConfirm, buildBroadcastPreviewScreen, buildBroadcastPromptScreen, buildBroadcastSentScreen, buildChannelGateScreen, buildDeviceDeleteConfirm, buildDeviceScreen, buildSpinResultScreen, buildSupportCategoryScreen, buildSupportPromptScreen, buildWhatsNewScreen, type BotScreen } from './rich-screens'
 import { broadcastThemeView, createBotBroadcast, findBroadcastTheme, parseBroadcastDraft, serializeBroadcastDraft, validateBroadcastText } from './broadcast-bot'
-import { claimChannelReward } from './channel-referrals'
+import { channelGate, claimChannelReward } from './channel-referrals'
 import { unbindUserDevice } from '@/lib/device-unbind'
 import { BonusBoxError, openBonusBox } from '@/lib/bonus-box'
 import { starsEnabled } from './stars'
@@ -150,6 +150,32 @@ export async function handleMiniAppUpdate(update: z.infer<typeof telegramUpdateS
     // Expired callback acknowledgements must not prevent the screen from opening.
     await miniAppBotCall('answerCallbackQuery', { callback_query_id: callback.id }).catch(() => {})
     const action = callback.data.slice(4)
+    // Кнопка «Я подписался»: свежая проверка членства, затем попытка начислить бонус.
+    if (action === 'chan:check') {
+      const gate = await channelGate(callback.from.id, { fresh: true })
+      if (gate) {
+        const html = buildChannelGateScreen(gate.channelUrl,
+          'Подписка пока не найдена — вступите в канал и нажмите кнопку ещё раз.')
+        await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
+        return
+      }
+      const account = await prisma.user.findUnique({ where: { telegramId: BigInt(callback.from.id) }, select: { id: true } })
+      let notice = '✅ Подписка подтверждена — добро пожаловать!'
+      if (account) try {
+        await claimChannelReward(account.id)
+        notice = '🎉 Подписка подтверждена — реферальный бонус начислен!'
+      } catch (e) { notice = e instanceof Error ? e.message : notice }
+      const html = await getBotScreen(callback.from.id, 'home', notice)
+      await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
+      return
+    }
+    // Пока приглашённый не вступил в канал, любые кнопки ведут на экран подписки.
+    const callbackGate = await channelGate(callback.from.id)
+    if (callbackGate) {
+      await displayCallbackScreen(callback.from.id, callback.message.message_id,
+        buildChannelGateScreen(callbackGate.channelUrl), miniAppUrl())
+      return
+    }
     if (action.startsWith('buyp:')) {
       // Оплата Stars с промокодом: payp:<planId>:<code>
       const rest = action.slice(5)
@@ -636,6 +662,17 @@ export async function handleMiniAppUpdate(update: z.infer<typeof telegramUpdateS
   }
   const message = update.message
   if (!message || message.chat.type !== 'private' || !message.from || message.chat.id !== message.from.id) return
+  // Приглашённый без подписки на канал видит только экран подписки — на любое сообщение.
+  if (process.env.TELEGRAM_RICH_MESSAGES_ENABLED === 'true') {
+    const gate = await channelGate(message.from.id)
+    if (gate) {
+      await prisma.telegramBotDialog.deleteMany({ where: { user: { telegramId: BigInt(message.from.id) } } })
+      await miniAppBotCall('deleteMessage', { chat_id: message.chat.id, message_id: message.message_id }).catch(() => {})
+      await miniAppBotCall('sendChatAction', { chat_id: message.chat.id, action: 'typing' }).catch(() => {})
+      await showBotScreen(message.chat.id, buildChannelGateScreen(gate.channelUrl), message.message_id)
+      return
+    }
+  }
   const text = message.text?.trim() ?? ''
   const caption = message.caption?.trim() ?? ''
   const photoSize = message.photo && message.photo.length > 0 ? message.photo[message.photo.length - 1]! : null

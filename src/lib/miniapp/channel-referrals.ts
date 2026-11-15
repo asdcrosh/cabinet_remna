@@ -67,6 +67,34 @@ export async function captureChannelReferral(userId: string, telegramId: bigint,
   })
 }
 
+// Короткий кэш членства, чтобы не дёргать Bot API на каждое сообщение пользователя.
+const gateMembershipCache = new Map<string, { member: boolean; at: number }>()
+const GATE_CACHE_TTL_MS = 60_000
+
+// Обязательная подписка на канал для приглашённых: пока пользователь не вступил,
+// бот показывает только экран подписки. При сбое проверки доступ не блокируем —
+// членство в любом случае перепроверяется при начислении бонуса.
+export async function channelGate(telegramId: number, options?: { fresh?: boolean }): Promise<{ channelUrl: string } | null> {
+  const campaign = channelCampaign()
+  if (!campaign || !await isFeatureEnabled('referrals')) return null
+  const id = BigInt(telegramId)
+  const referral = await prisma.telegramChannelReferral.findUnique({
+    where: { referredTelegramId: id }, select: { claimedAt: true, channelId: true } })
+  if (!referral || referral.claimedAt) return null
+  const key = id.toString()
+  const cached = gateMembershipCache.get(key)
+  if (!options?.fresh && cached && Date.now() - cached.at < GATE_CACHE_TTL_MS) {
+    return cached.member ? null : { channelUrl: campaign.channelUrl }
+  }
+  try {
+    const member = isChannelMember(await membership(referral.channelId, id))
+    gateMembershipCache.set(key, { member, at: Date.now() })
+    return member ? null : { channelUrl: campaign.channelUrl }
+  } catch {
+    return null
+  }
+}
+
 export async function claimChannelReward(userId: string) {
   const campaign = channelCampaign()
   if (!campaign || !await isFeatureEnabled('referrals')) throw new AuthError(404, 'Программа пока не включена')

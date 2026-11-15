@@ -518,3 +518,16 @@ export function buildRichPaymentScreen(input: RichScreenInput, planId: string, y
   parts.push('<hr><p>Бот и кабинет используют один аккаунт: оплата из любого места продлит ту же подписку.</p>', row(cb('💎 К тарифам', 'plans')))
   return parts.join('')
 }
+
+// Экран обязательной подписки на канал: видят приглашённые пользователи до вступления.
+export function buildChannelGateScreen(channelUrl: string, notice?: string) {
+  const parts = ['<h2>AlekseevVP</h2>', '<h3>📢 Подписка на канал</h3>']
+  if (notice) parts.push(`<blockquote>💬 ${escape(notice)}</blockquote>`)
+  parts.push(
+    '<p>Чтобы пользоваться ботом, подпишитесь на наш канал — там новости сервиса, промокоды и розыгрыши.</p>',
+    '<p>После вступления вернитесь сюда и нажмите «Проверить подписку» — бот сразу откроется.</p>',
+    row(urlBtn('📢 Подписаться на канал', channelUrl)),
+    row(cb('✅ Я подписался — проверить', 'chan:check', 'success')),
+  )
+  return parts.join('')
+}
