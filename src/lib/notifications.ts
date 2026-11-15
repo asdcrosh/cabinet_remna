@@ -17,6 +17,7 @@ import { readWhitelistAddonSnapshot } from './whitelist-addon'
 import { isWhitelistAddonPaused } from './whitelist-addon-policy'
 import { readDeviceLimitAddonSnapshot } from './device-limit-addon'
 import { sendPushToUser } from './push'
+import { sendSupportReplyBotMessage } from './miniapp/support-notify'
 
 const RENEW_PATH = '/dashboard/plans?intent=renew'
 const SUBSCRIPTION_PATH = '/dashboard/subscription'
@@ -594,14 +595,29 @@ export async function notifySupportReply(input: { ticketId: string; messageId: s
       id: true,
       subject: true,
       userId: true,
-      user: { select: { name: true } },
+      user: {
+        select: {
+          name: true,
+          telegramId: true,
+          notificationPreference: { select: { telegramEnabled: true } },
+        },
+      },
     },
   })
   if (!ticket) return
+  const reply = await prisma.supportMessage.findUnique({
+    where: { id: input.messageId },
+    select: { body: true },
+  })
+  const excerpt = reply?.body.trim() ? reply.body.trim().slice(0, 350) : null
 
   const body = `В обращении «${ticket.subject}» появился новый ответ.`
   // Ссылка на само обращение: кабинет и приложение StealthNet открывают сразу переписку.
   const ticketPath = `/dashboard/support?ticket=${encodeURIComponent(ticket.id)}`
+  // Бот доставляет ответ сразу с текстом и кнопками; иначе — обычное уведомление.
+  const botSent = Boolean(excerpt) && ticket.user.telegramId != null && ticket.user.notificationPreference?.telegramEnabled !== false
+    ? await sendSupportReplyBotMessage(Number(ticket.user.telegramId), { ticketId: ticket.id, subject: ticket.subject, excerpt: excerpt! })
+    : false
   await notifyUser({
     userId: ticket.userId,
     type: 'SUPPORT_REPLY',
@@ -610,13 +626,15 @@ export async function notifySupportReply(input: { ticketId: string; messageId: s
     body,
     actionHref: ticketPath,
     actionLabel: 'Открыть чат',
-    telegramText: [`<b>Ответ поддержки</b>`, escapeTelegram(body)].join('\n'),
+    telegramText: botSent
+      ? undefined
+      : [`<b>Ответ поддержки</b>`, escapeTelegram(body), ...(excerpt ? [escapeTelegram(excerpt)] : [])].join('\n'),
     emailSubject: `Ответ поддержки — ${getBrandName()}`,
-    emailText: `${body}\n\nОткрыть поддержку: ${getAppUrl()}${ticketPath}`,
+    emailText: `${body}${excerpt ? `\n\n${excerpt}` : ''}\n\nОткрыть поддержку: ${getAppUrl()}${ticketPath}`,
     emailHtml: renderNotificationEmail({
       eyebrow: 'Поддержка',
       title: 'Ответ поддержки',
-      lead: body,
+      lead: excerpt ? `${body}\n\n«${excerpt}»` : body,
       ctaLabel: 'Открыть чат',
       ctaUrl: `${getAppUrl()}${ticketPath}`,
       greetingName: ticket.user.name,

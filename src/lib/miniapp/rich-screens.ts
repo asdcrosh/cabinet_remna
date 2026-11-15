@@ -204,7 +204,8 @@ export function buildRichScreen(input: RichScreenInput) {
           ['💳 Оплаты сегодня', String(input.adminStats.paymentsToday)],
           ['🛟 Открытые тикеты', String(input.adminStats.openTickets)],
         ]))
-        parts.push('<p>Пользователи, платежи, тарифы, рассылки и поддержка — в панели управления.</p>', row(app('🛠 Открыть панель управления', 'admin')))
+        parts.push(row(cb('🛟 Обращения пользователей', 'admt', 'success')))
+        parts.push('<p>Пользователи, платежи, тарифы и рассылки — в панели управления.</p>', row(app('🛠 Открыть панель управления', 'admin')))
       }
       break
   }
@@ -274,20 +275,41 @@ export function buildSupportPromptScreen(input: RichScreenInput, prompt: { title
 }
 
 // Диалог с поддержкой внутри бота: последние сообщения и действия с тикетом.
-export function buildSupportThreadScreen(input: RichScreenInput, thread: { id: string; subject: string; status: string; messages: BotThreadMessage[] }) {
+// viewer 'admin' меняет подписи сторон и набор кнопок на административные.
+export function buildSupportThreadScreen(input: RichScreenInput, thread: { id: string; subject: string; status: string; userLabel?: string; messages: BotThreadMessage[] }, opts?: { viewer?: 'user' | 'admin' }) {
+  const viewer = opts?.viewer ?? 'user'
   const parts = [brandHeader(input.bannerUrl), '<h3>🛟 Обращение</h3>',
     `<h4>${escape(thread.subject)}</h4>`,
-    table([['Статус', thread.status]])]
+    table([...(thread.userLabel ? [['👤 Пользователь', thread.userLabel]] : []), ['Статус', thread.status]])]
   if (!thread.messages.length) parts.push('<p>Сообщений пока нет.</p>')
   if (thread.messages.length) {
     parts.push('<h4>💬 Переписка</h4>')
     for (const message of thread.messages) {
-      parts.push(`<p>${message.from === 'admin' ? '🛟 Поддержка' : 'Вы'} · ${escape(message.date)}<br>${escape(message.body)}</p>`)
+      const author = message.from === 'admin' ? (viewer === 'admin' ? 'Вы' : '🛟 Поддержка') : (viewer === 'admin' ? '👤 Пользователь' : 'Вы')
+      parts.push(`<p>${author} · ${escape(message.date)}<br>${escape(message.body)}</p>`)
     }
   }
-  parts.push(row(cb('✍️ Ответить', `supr:${thread.id}`, 'success')))
-  parts.push(row(cb('✅ Закрыть обращение', `supc:${thread.id}`)))
-  parts.push(row(cb('◀️ К обращениям', 'support')))
+  parts.push(row(cb('✍️ Ответить', `${viewer === 'admin' ? 'admr' : 'supr'}:${thread.id}`, 'success')))
+  parts.push(row(cb('✅ Закрыть обращение', `${viewer === 'admin' ? 'admc' : 'supc'}:${thread.id}`)))
+  parts.push(row(cb('◀️ К обращениям', viewer === 'admin' ? 'admt' : 'support')))
+  return parts.join('')
+}
+
+export type BotAdminTicket = { id: string; subject: string; status: string; userLabel: string; date: string; fresh: boolean }
+
+// Очередь обращений для администратора — ответить можно прямо из бота.
+export function buildAdminTicketsScreen(input: RichScreenInput, tickets: BotAdminTicket[]) {
+  const parts = [brandHeader(input.bannerUrl), '<h3>🛟 Обращения пользователей</h3>']
+  if (input.notice) parts.push(`<p>💬 ${escape(input.notice)}</p>`)
+  if (!tickets.length) parts.push('<p>✅ Открытых обращений нет.</p>')
+  if (tickets.length) {
+    parts.push(table(tickets.map(ticket => [`${ticket.fresh ? '🔴 ' : ''}${ticket.userLabel}`, `${ticket.subject} · ${ticket.status}`])),
+      '<p>Нажмите на обращение, чтобы открыть переписку и ответить.</p>')
+    for (const ticket of tickets.slice(0, 8)) {
+      parts.push(row(cb(`💬 ${ticket.subject.slice(0, 18)} · ${ticket.userLabel.slice(0, 12)}`, `admt:${ticket.id}`)))
+    }
+  }
+  parts.push(row(cb('◀️ В управление', 'admin')))
   return parts.join('')
 }
 

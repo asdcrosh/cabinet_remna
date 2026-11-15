@@ -3,7 +3,7 @@ import { miniAppBotCall } from './bot-api'
 import { miniAppUrl } from './config'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
-import { getBotPaymentScreen, getBotScreen, getBotScreenInput, getBotSupportThreadScreen } from './bot-screens'
+import { getBotAdminThreadScreen, getBotAdminTicketsScreen, getBotPaymentScreen, getBotScreen, getBotScreenInput, getBotSupportThreadScreen } from './bot-screens'
 import { botScreens, buildAutoRenewalOffConfirm, buildDeviceDeleteConfirm, buildDeviceScreen, buildSpinResultScreen, buildSupportCategoryScreen, buildSupportPromptScreen, type BotScreen } from './rich-screens'
 import { claimChannelReward } from './channel-referrals'
 import { unbindUserDevice } from '@/lib/device-unbind'
@@ -16,7 +16,7 @@ import { rateLimitKey } from '@/lib/rate-limit'
 import { answerStarsPreCheckout, isOurStarsPayload, refundStarsPayment, settleStarsPayment } from './stars-payments'
 import { displayCallbackScreen } from './callback-screen'
 import { clearBotDialogState, hasPendingBotDialog, setBotDialogState } from './bot-dialog'
-import { closeTicketFromBot, createTicketFromBot, isSupportCategory, replyToTicketFromBot } from './support-bot'
+import { closeTicketAsAdmin, closeTicketFromBot, createTicketFromBot, isSupportCategory, replyToTicketAsAdmin, replyToTicketFromBot } from './support-bot'
 import { supportCategories } from '@/lib/support'
 import { disableAutoRenewal } from '@/lib/auto-renewal'
 
@@ -277,6 +277,42 @@ export async function handleMiniAppUpdate(update: z.infer<typeof telegramUpdateS
       await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
       return
     }
+    if (action === 'admt') {
+      const html = await getBotAdminTicketsScreen(callback.from.id)
+      await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
+      return
+    }
+    if (action.startsWith('admt:')) {
+      const html = await getBotAdminThreadScreen(callback.from.id, action.slice(5))
+      await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
+      return
+    }
+    if (action.startsWith('admr:')) {
+      const ticketId = action.slice(5)
+      const account = await prisma.user.findUnique({ where: { telegramId: BigInt(callback.from.id) }, select: { id: true, role: true } })
+      const ticket = account && account.role !== 'USER'
+        ? await prisma.supportTicket.findUnique({ where: { id: ticketId }, select: { subject: true, status: true } })
+        : null
+      if (account && ticket && ticket.status !== 'CLOSED') {
+        await setBotDialogState(account.id, `admin:reply:${ticketId}`)
+        const html = buildSupportPromptScreen(await getBotScreenInput(callback.from.id, 'admin'),
+          { title: ticket.subject, hint: 'Напишите ответ — пользователь получит его в бот и в кабинет.' })
+        await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
+        return
+      }
+      const html = await getBotAdminTicketsScreen(callback.from.id, ticket ? 'Обращение уже закрыто.' : 'Обращение не найдено')
+      await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
+      return
+    }
+    if (action.startsWith('admc:')) {
+      const account = await prisma.user.findUnique({ where: { telegramId: BigInt(callback.from.id) }, select: { id: true, role: true } })
+      const result = account && account.role !== 'USER'
+        ? await closeTicketAsAdmin(account.id, action.slice(5))
+        : { ok: false as const, error: 'Раздел доступен администраторам.' }
+      const html = await getBotAdminTicketsScreen(callback.from.id, result.ok ? 'Обращение закрыто.' : result.error)
+      await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
+      return
+    }
     let screen: BotScreen = botScreens.includes(action as BotScreen) ? action as BotScreen : 'home'
     let notice: string | undefined
     if (action === 'claim') {
@@ -346,12 +382,14 @@ function checkoutUuid(callbackId: string) {
   return callbackUuid('avp-checkout', callbackId)
 }
 
-// Свободный текст в ожидаемом диалоге: новое обращение или ответ в тикет.
-// Состояние сохраняется при ошибках валидации, чтобы пользователь мог исправить текст.
+// Свободный текст в ожидаемом диалоге: новое обращение, ответ в тикет
+// или ответ администратора. Состояние сохраняется при ошибках валидации,
+// чтобы текст можно было исправить и отправить повторно.
 async function handleBotDialogMessage(chatId: number, userId: string, state: string, text: string) {
-  let notice: string
+  let html: string
   if (state.startsWith('support:new:')) {
     const category = state.slice('support:new:'.length)
+    let notice: string
     if (!isSupportCategory(category)) {
       await clearBotDialogState(userId)
       notice = 'Сессия обращения устарела. Начните заново.'
@@ -362,20 +400,35 @@ async function handleBotDialogMessage(chatId: number, userId: string, state: str
         notice = 'Обращение отправлено. Ответ придёт в этот чат и в кабинет.'
       } else notice = result.error
     }
+    html = await getBotScreen(chatId, 'support', notice)
   } else if (state.startsWith('support:reply:')) {
-    const result = await replyToTicketFromBot(userId, state.slice('support:reply:'.length), text)
+    const ticketId = state.slice('support:reply:'.length)
+    const result = await replyToTicketFromBot(userId, ticketId, text)
     if (result.ok) {
       await clearBotDialogState(userId)
-      notice = 'Сообщение отправлено в поддержку.'
+      html = await getBotSupportThreadScreen(chatId, ticketId)
     } else if (result.error.includes('закрыто') || result.error.includes('не найдено')) {
       await clearBotDialogState(userId)
-      notice = result.error
-    } else notice = result.error
+      html = await getBotScreen(chatId, 'support', result.error)
+    } else {
+      html = await getBotScreen(chatId, 'support', result.error)
+    }
+  } else if (state.startsWith('admin:reply:')) {
+    const ticketId = state.slice('admin:reply:'.length)
+    const result = await replyToTicketAsAdmin(userId, ticketId, text)
+    if (result.ok) {
+      await clearBotDialogState(userId)
+      html = await getBotAdminThreadScreen(chatId, ticketId, 'Ответ отправлен пользователю.')
+    } else if (result.error.includes('закрыто') || result.error.includes('не найдено') || result.error.includes('доступен')) {
+      await clearBotDialogState(userId)
+      html = await getBotAdminTicketsScreen(chatId, result.error)
+    } else {
+      html = await getBotAdminThreadScreen(chatId, ticketId, result.error)
+    }
   } else {
     await clearBotDialogState(userId)
-    notice = 'Сессия устарела. Начните заново.'
+    html = await getBotScreen(chatId, 'support', 'Сессия устарела. Начните заново.')
   }
-  const html = await getBotScreen(chatId, 'support', notice)
   await miniAppBotCall('sendRichMessage', { chat_id: chatId, rich_message: { html }, protect_content: true })
 }
 

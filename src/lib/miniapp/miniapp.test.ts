@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { buildAutoRenewalOffConfirm, buildDeviceDeleteConfirm, buildDeviceScreen, buildRichPaymentScreen, buildRichScreen, buildSpinResultScreen, buildSupportCategoryScreen, buildSupportPromptScreen, buildSupportThreadScreen } from './rich-screens'
+import { buildAdminTicketsScreen, buildAutoRenewalOffConfirm, buildDeviceDeleteConfirm, buildDeviceScreen, buildRichPaymentScreen, buildRichScreen, buildSpinResultScreen, buildSupportCategoryScreen, buildSupportPromptScreen, buildSupportThreadScreen } from './rich-screens'
 import { channelCampaign, isChannelMember, isChannelReference } from './channel-referrals'
 import { miniAppDemo } from './model'
 import { isMiniAppOwnedUpdate, isPaymentUpdate, isUnsupportedPaymentUpdate, isUnsupportedCallback, telegramUpdateSchema, validWebhookSecret } from './bot'
@@ -147,6 +147,25 @@ describe('Telegram Mini App boundaries', () => {
     expect(promo).toContain('type="copy_text"')
     const plans = buildRichScreen({ screen: 'plans', overview: miniAppDemo, appUrl })
     expect(plans).not.toContain('type="web_app"')
+  })
+  it('gives admins a native ticket queue in the bot', () => {
+    const appUrl = 'https://cabinet.example.test/miniapp'
+    const admin = buildRichScreen({ screen: 'admin', overview: miniAppDemo, appUrl, admin: true,
+      adminStats: { users: 10, activeSubscriptions: 5, paymentsToday: 1, openTickets: 2 } })
+    expect(admin).toContain('avp:admt')
+    const list = buildAdminTicketsScreen({ screen: 'admin', overview: miniAppDemo, appUrl },
+      [{ id: 'ticket-1', subject: 'Проблема с подключением', status: 'Ждёт ответа', userLabel: '@ivan', date: '01.11.2026', fresh: true }])
+    expect(list).toContain('avp:admt:ticket-1')
+    expect(list).toContain('@ivan')
+    expect(list).toContain('🔴')
+    const thread = buildSupportThreadScreen({ screen: 'admin', overview: miniAppDemo, appUrl },
+      { id: 'ticket-1', subject: 'Проблема с подключением', status: 'Ждёт ответа', userLabel: '@ivan',
+        messages: [{ from: 'user', body: 'Не подключается', date: '01.11.2026' }] }, { viewer: 'admin' })
+    expect(thread).toContain('👤 Пользователь')
+    expect(thread).toContain('@ivan')
+    expect(thread).toContain('avp:admr:ticket-1')
+    expect(thread).toContain('avp:admc:ticket-1')
+    expect(buildAdminTicketsScreen({ screen: 'admin', overview: miniAppDemo, appUrl }, [])).toContain('Открытых обращений нет')
   })
   it('shows service stats only to admins', () => {
     const html = buildRichScreen({ screen: 'admin', overview: miniAppDemo, appUrl: 'https://cabinet.example.test/miniapp',

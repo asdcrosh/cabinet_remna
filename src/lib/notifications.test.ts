@@ -16,15 +16,21 @@ const mocks = vi.hoisted(() => {
     supportTicket: {
       findUnique: vi.fn(),
     },
+    supportMessage: {
+      findUnique: vi.fn(),
+    },
   }
 
   return { prisma }
 })
 
+const botReplyMock = vi.hoisted(() => ({ sendSupportReplyBotMessage: vi.fn(async () => false) }))
+
 vi.mock('./prisma', () => ({ prisma: mocks.prisma }))
 vi.mock('./app-url', () => ({ getAppUrl: () => 'https://cabinet.example.test' }))
 vi.mock('./branding', () => ({ getBrandName: () => 'Cabinet' }))
 vi.mock('./email-template', () => ({ renderActionEmail: () => '<p>Email</p>' }))
+vi.mock('./miniapp/support-notify', () => botReplyMock)
 
 import {
   notifySubscriptionExpiring,
@@ -614,5 +620,35 @@ describe('notifyUser', () => {
     }))
     const emailCall = vi.mocked(fetch).mock.calls.find(([url]) => String(url).includes('mail.example.test'))
     expect(String(emailCall?.[1]?.body)).toContain('https://cabinet.example.test/dashboard/support?ticket=ticket%201')
+  })
+
+  it('доставляет ответ поддержки в бот с текстом и не дублирует обычным сообщением', async () => {
+    botReplyMock.sendSupportReplyBotMessage.mockClear().mockResolvedValue(true)
+    mocks.prisma.supportTicket.findUnique.mockResolvedValue({
+      id: 'ticket-1',
+      subject: 'Проблема с подключением',
+      userId: 'user-1',
+      user: { name: 'User', telegramId: 777n, notificationPreference: { telegramEnabled: true } },
+    })
+    mocks.prisma.supportMessage.findUnique.mockResolvedValue({ body: 'Переподключитесь и проверьте снова.' })
+    mocks.prisma.user.findUnique.mockResolvedValue({
+      id: 'user-1',
+      email: 'user@example.test',
+      emailVerifiedAt: new Date(),
+      name: 'User',
+      telegramId: 777n,
+    })
+    mocks.prisma.notificationLog.createMany.mockResolvedValue({ count: 1 })
+    mocks.prisma.userNotification.createMany.mockResolvedValue({ count: 1 })
+
+    await notifySupportReply({ ticketId: 'ticket-1', messageId: 'message-1' })
+
+    expect(botReplyMock.sendSupportReplyBotMessage).toHaveBeenCalledWith(777, {
+      ticketId: 'ticket-1',
+      subject: 'Проблема с подключением',
+      excerpt: 'Переподключитесь и проверьте снова.',
+    })
+    const legacyTelegramCall = vi.mocked(fetch).mock.calls.find(([url]) => String(url).includes('api.telegram.org'))
+    expect(legacyTelegramCall).toBeUndefined()
   })
 })

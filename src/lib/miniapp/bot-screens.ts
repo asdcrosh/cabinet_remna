@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { getMiniAppOverview } from './overview'
-import { buildRichScreen, buildRichPaymentScreen, buildSupportThreadScreen, type BotScreen, type BotThreadMessage, type RichScreenInput } from './rich-screens'
+import { buildAdminTicketsScreen, buildRichScreen, buildRichPaymentScreen, buildSupportThreadScreen, type BotScreen, type BotThreadMessage, type RichScreenInput } from './rich-screens'
 import { miniAppUrl } from './config'
 import { channelCampaign } from './channel-referrals'
 import { ensureUserReferralCode } from '@/lib/referrals'
@@ -161,4 +161,63 @@ export async function getBotSupportThreadScreen(telegramId: number, ticketId: st
     date: formatDate(message.createdAt),
   }))
   return buildSupportThreadScreen(input, { id: ticket.id, subject: ticket.subject, status: ticketStatusLabel(ticket.status), messages })
+}
+
+
+const adminTicketStatusLabel = (status: string) =>
+  status === 'WAITING_ADMIN' || status === 'OPEN' ? 'Ждёт ответа' : status === 'WAITING_USER' ? 'Отвечено' : 'Закрыто'
+const adminUserLabel = (user: { name: string | null; telegramUsername: string | null; email: string }) =>
+  user.name?.split(' ')[0] || (user.telegramUsername ? `@${user.telegramUsername}` : user.email)
+
+// Очередь обращений для администратора.
+export async function getBotAdminTicketsScreen(telegramId: number, notice?: string) {
+  const account = await prisma.user.findUnique({ where: { telegramId: BigInt(telegramId) }, select: { id: true, role: true } })
+  if (!account || account.role === 'USER') return getBotScreen(telegramId, 'home', 'Раздел доступен администраторам')
+  const input = await getBotScreenInput(telegramId, 'admin', notice)
+  const tickets = await prisma.supportTicket.findMany({
+    where: { status: { not: 'CLOSED' } },
+    orderBy: [{ adminUnreadCount: 'desc' }, { lastMessageAt: 'desc' }],
+    take: 8,
+    select: {
+      id: true, subject: true, status: true, lastMessageAt: true, adminUnreadCount: true,
+      user: { select: { name: true, telegramUsername: true, email: true } },
+    },
+  })
+  return buildAdminTicketsScreen(input, tickets.map(ticket => ({
+    id: ticket.id,
+    subject: ticket.subject,
+    status: adminTicketStatusLabel(ticket.status),
+    userLabel: adminUserLabel(ticket.user),
+    date: formatDate(ticket.lastMessageAt),
+    fresh: ticket.adminUnreadCount > 0,
+  })))
+}
+
+// Переписка обращения глазами администратора. Помечает тикет прочитанным админом.
+export async function getBotAdminThreadScreen(telegramId: number, ticketId: string, notice?: string) {
+  const account = await prisma.user.findUnique({ where: { telegramId: BigInt(telegramId) }, select: { id: true, role: true } })
+  if (!account || account.role === 'USER') return getBotScreen(telegramId, 'home', 'Раздел доступен администраторам')
+  const ticket = await prisma.supportTicket.findUnique({
+    where: { id: ticketId },
+    select: {
+      id: true, subject: true, status: true,
+      user: { select: { name: true, telegramUsername: true, email: true } },
+      messages: { orderBy: { createdAt: 'desc' }, take: 6, select: { body: true, senderRole: true, createdAt: true } },
+    },
+  })
+  if (!ticket) return getBotAdminTicketsScreen(telegramId, 'Обращение не найдено')
+  await prisma.supportTicket.updateMany({ where: { id: ticket.id, adminUnreadCount: { gt: 0 } }, data: { adminUnreadCount: 0 } })
+  const input = await getBotScreenInput(telegramId, 'admin', notice)
+  const messages: BotThreadMessage[] = ticket.messages.reverse().map(message => ({
+    from: message.senderRole === 'USER' ? 'user' : 'admin',
+    body: message.body.length > 500 ? `${message.body.slice(0, 500)}…` : message.body,
+    date: formatDate(message.createdAt),
+  }))
+  return buildSupportThreadScreen(input, {
+    id: ticket.id,
+    subject: ticket.subject,
+    status: adminTicketStatusLabel(ticket.status),
+    userLabel: adminUserLabel(ticket.user),
+    messages,
+  }, { viewer: 'admin' })
 }
