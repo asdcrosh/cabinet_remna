@@ -7,7 +7,7 @@ export const botScreens: BotScreen[] = ['home', 'subscription', 'plans', 'billin
 export type BotDevice = { id: string; title: string; platform: string }
 export type BotSpinResult = { prizeTitle: string; prizeDescription: string | null; promoCode: string | null; promoCodeExpiresAt: string | null; remainingAttempts: number }
 export type BotTicket = { id: string; subject: string; status: string }
-export type BotThreadMessage = { from: 'user' | 'admin'; body: string; date: string }
+export type BotThreadMessage = { from: 'user' | 'admin'; body: string; date: string; attachments?: string[] }
 export type BotPromoCode = { code: string; discountPercent: number; expiresAt: string | null }
 export type RichScreenInput = {
   screen: BotScreen
@@ -292,7 +292,7 @@ export function buildSupportCategoryScreen(input: RichScreenInput, categories: A
 export function buildSupportPromptScreen(input: RichScreenInput, prompt: { title: string; hint: string }) {
   const parts = [brandHeader(input.bannerUrl), `<h3>✍️ ${escape(prompt.title)}</h3>`,
     `<p>${escape(prompt.hint)}</p>`,
-    '<p>Просто отправьте следующее сообщение в этот чат — оно попадёт в поддержку и в ваш кабинет.</p>',
+    '<p>Просто отправьте следующее сообщение в этот чат — оно попадёт в поддержку и в ваш кабинет. Можно приложить фото или файл (JPG, PNG, WEBP, PDF до 5 МБ).</p>',
     row(cb('◀️ Отмена', 'sup:cancel'))]
   return parts.join('')
 }
@@ -310,11 +310,14 @@ export function buildSupportThreadScreen(input: RichScreenInput, thread: { id: s
     parts.push('<h4>💬 Переписка</h4>')
     for (const message of thread.messages) {
       const author = message.from === 'admin' ? (viewer === 'admin' ? 'Вы' : '🛟 Поддержка') : (viewer === 'admin' ? '👤 Пользователь' : 'Вы')
-      parts.push(`<p>${author} · ${escape(message.date)}<br>${escape(message.body)}</p>`)
+      const files = message.attachments && message.attachments.length > 0
+        ? `<br>📎 ${escape(message.attachments.join(', '))}`
+        : ''
+      parts.push(`<p>${author} · ${escape(message.date)}<br>${escape(message.body)}${files}</p>`)
     }
   }
   if (thread.status !== 'Закрыто') {
-    parts.push('<p>✍️ Пишите ответ прямо в чат — следующее сообщение попадёт в обращение и появится здесь. Ваш текст после отправки убирается, переписка остаётся в этом окне.</p>',
+    parts.push('<p>✍️ Пишите ответ прямо в чат — следующее сообщение попадёт в обращение и появится здесь. Ваш текст после отправки убирается, переписка остаётся в этом окне. Можно приложить фото или файл.</p>',
       row(cb('✅ Закрыть обращение', `${viewer === 'admin' ? 'admc' : 'supc'}:${thread.id}`)))
   }
   parts.push(row(cb('◀️ К обращениям', viewer === 'admin' ? 'admt' : 'support')))

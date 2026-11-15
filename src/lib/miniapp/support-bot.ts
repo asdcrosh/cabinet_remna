@@ -9,6 +9,9 @@ import { syncAdminTicketsQueues, syncSupportThreadViews } from './support-sync'
 
 export type BotSupportResult = { ok: true; ticketId?: string } | { ok: false; error: string }
 
+// Вложение, уже проверенное buildSupportAttachment (лимит, тип, сигнатура).
+export type BotSupportAttachment = { fileName: string; mimeType: string; sizeBytes: number; data: Buffer }
+
 const categoryValues = new Set<string>(supportCategories.map(category => category.value))
 export function isSupportCategory(value: string): value is SupportCategoryValue {
   return categoryValues.has(value)
@@ -16,7 +19,7 @@ export function isSupportCategory(value: string): value is SupportCategoryValue 
 
 // Обращения из бота проходят через те же таблицы и уведомления, что и из кабинета:
 // диалог виден в обоих местах сразу.
-export async function createTicketFromBot(userId: string, category: SupportCategoryValue, message: string): Promise<BotSupportResult> {
+export async function createTicketFromBot(userId: string, category: SupportCategoryValue, message: string, attachment?: BotSupportAttachment | null): Promise<BotSupportResult> {
   const text = message.trim()
   if (text.length < 5) return { ok: false, error: 'Напишите чуть подробнее — от 5 символов.' }
   if (text.length > 3000) return { ok: false, error: 'Сообщение слишком длинное. Сократите до 3000 символов.' }
@@ -30,7 +33,12 @@ export async function createTicketFromBot(userId: string, category: SupportCateg
       category,
       status: 'WAITING_ADMIN',
       adminUnreadCount: 1,
-      messages: { create: { senderId: userId, senderRole: 'USER', body: text } },
+      messages: { create: {
+        senderId: userId,
+        senderRole: 'USER',
+        body: text,
+        ...(attachment ? { attachments: { create: attachment } } : {}),
+      } },
     },
     select: { id: true, subject: true },
   })
@@ -39,7 +47,7 @@ export async function createTicketFromBot(userId: string, category: SupportCateg
   return { ok: true, ticketId: ticket.id }
 }
 
-export async function replyToTicketFromBot(userId: string, ticketId: string, message: string): Promise<BotSupportResult> {
+export async function replyToTicketFromBot(userId: string, ticketId: string, message: string, attachment?: BotSupportAttachment | null): Promise<BotSupportResult> {
   const text = message.trim()
   if (!text) return { ok: false, error: 'Напишите сообщение перед отправкой.' }
   if (text.length > 3000) return { ok: false, error: 'Сообщение слишком длинное. Сократите до 3000 символов.' }
@@ -52,7 +60,13 @@ export async function replyToTicketFromBot(userId: string, ticketId: string, mes
 
   const created = await prisma.$transaction(async tx => {
     const message = await tx.supportMessage.create({
-      data: { ticketId: ticket.id, senderId: userId, senderRole: 'USER', body: text },
+      data: {
+        ticketId: ticket.id,
+        senderId: userId,
+        senderRole: 'USER',
+        body: text,
+        ...(attachment ? { attachments: { create: attachment } } : {}),
+      },
       select: { id: true, createdAt: true },
     })
     await tx.supportTicket.update({
@@ -80,7 +94,7 @@ export async function closeTicketFromBot(userId: string, ticketId: string): Prom
 
 // Ответ администратора из бота: то же сообщение, что отправляет панель
 // кабинета — пользователь получает его в бот и в переписку кабинета.
-export async function replyToTicketAsAdmin(adminId: string, ticketId: string, message: string): Promise<BotSupportResult> {
+export async function replyToTicketAsAdmin(adminId: string, ticketId: string, message: string, attachment?: BotSupportAttachment | null): Promise<BotSupportResult> {
   const admin = await prisma.user.findUnique({ where: { id: adminId }, select: { role: true } })
   if (!admin || admin.role === 'USER') return { ok: false, error: 'Раздел доступен администраторам.' }
   const text = message.trim()
@@ -95,7 +109,13 @@ export async function replyToTicketAsAdmin(adminId: string, ticketId: string, me
 
   const created = await prisma.$transaction(async tx => {
     const message = await tx.supportMessage.create({
-      data: { ticketId: ticket.id, senderId: adminId, senderRole: 'ADMIN', body: text },
+      data: {
+        ticketId: ticket.id,
+        senderId: adminId,
+        senderRole: 'ADMIN',
+        body: text,
+        ...(attachment ? { attachments: { create: attachment } } : {}),
+      },
       select: { id: true, createdAt: true },
     })
     await tx.supportTicket.update({

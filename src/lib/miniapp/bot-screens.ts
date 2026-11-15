@@ -150,7 +150,8 @@ export async function getBotSupportThreadScreen(telegramId: number, ticketId: st
   const ticket = account ? await prisma.supportTicket.findFirst({
     where: { id: ticketId, userId: account.id },
     select: { id: true, subject: true, status: true, updatedAt: true,
-      messages: { orderBy: { createdAt: 'desc' }, take: 6, select: { body: true, senderRole: true, createdAt: true } } },
+      messages: { orderBy: { createdAt: 'desc' }, take: 6,
+        select: { body: true, senderRole: true, createdAt: true, attachments: { select: { fileName: true } } } } },
   }) : null
   if (!ticket) return getBotScreen(telegramId, 'support', 'Обращение не найдено')
   if (ticket.status !== 'CLOSED') {
@@ -160,6 +161,7 @@ export async function getBotSupportThreadScreen(telegramId: number, ticketId: st
     from: message.senderRole === 'USER' ? 'user' : 'admin',
     body: message.body.length > 500 ? `${message.body.slice(0, 500)}…` : message.body,
     date: formatDate(message.createdAt),
+    attachments: message.attachments.map(file => file.fileName),
   }))
   return buildSupportThreadScreen(input, { id: ticket.id, subject: ticket.subject, status: ticketStatusLabel(ticket.status), messages })
 }
@@ -211,7 +213,8 @@ export async function getBotAdminThreadScreen(telegramId: number, ticketId: stri
     select: {
       id: true, subject: true, status: true,
       user: { select: { name: true, telegramUsername: true, email: true } },
-      messages: { orderBy: { createdAt: 'desc' }, take: 6, select: { body: true, senderRole: true, createdAt: true } },
+      messages: { orderBy: { createdAt: 'desc' }, take: 6,
+        select: { body: true, senderRole: true, createdAt: true, attachments: { select: { fileName: true } } } },
     },
   })
   if (!ticket) return getBotAdminTicketsScreen(telegramId, 'Обращение не найдено')
@@ -221,6 +224,7 @@ export async function getBotAdminThreadScreen(telegramId: number, ticketId: stri
     from: message.senderRole === 'USER' ? 'user' : 'admin',
     body: message.body.length > 500 ? `${message.body.slice(0, 500)}…` : message.body,
     date: formatDate(message.createdAt),
+    attachments: message.attachments.map(file => file.fileName),
   }))
   return buildSupportThreadScreen(input, {
     id: ticket.id,

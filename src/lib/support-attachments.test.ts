@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  buildSupportAttachment,
   readSupportMutationRequest,
   SupportAttachmentError,
 } from './support-attachments'
@@ -76,5 +77,19 @@ describe('support attachments', () => {
       .rejects.toThrow('не больше 5 МБ')
     await expect(readSupportMutationRequest(multipartRequest([pngOfSize(5 * 1024 * 1024 + 1)])))
       .rejects.toThrow('не больше 5 МБ')
+  })
+
+  // Программный путь: файл, скачанный ботом из Telegram, проходит те же проверки.
+  it('validates bot-downloaded files with the same rules', () => {
+    const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3, 4])
+    const ok = buildSupportAttachment({ fileName: 'photo.jpg', mimeType: 'image/jpeg', data: jpeg })
+    expect(ok).toMatchObject({ fileName: 'photo.jpg', mimeType: 'image/jpeg', sizeBytes: 8 })
+
+    expect(() => buildSupportAttachment({ fileName: 'notes.txt', mimeType: 'text/plain', data: Buffer.from('hi') }))
+      .toThrow('JPG, PNG, WEBP и PDF')
+    expect(() => buildSupportAttachment({ fileName: 'fake.png', mimeType: 'image/png', data: Buffer.from('not an image') }))
+      .toThrow('не совпадает')
+    expect(() => buildSupportAttachment({ fileName: 'big.png', mimeType: 'image/png', data: Buffer.alloc(5 * 1024 * 1024 + 1) }))
+      .toThrow('не больше 5 МБ')
   })
 })

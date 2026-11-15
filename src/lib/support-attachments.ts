@@ -41,25 +41,29 @@ export async function readSupportAttachments(entries: FormDataEntryValue[]) {
   }
 
   return Promise.all(files.map(async (file) => {
-    if (file.size <= 0 || file.size > SUPPORT_ATTACHMENT_MAX_SIZE) {
-      throw new SupportAttachmentError('Размер каждого файла должен быть не больше 5 МБ.')
-    }
-    if (!ALLOWED_MIME_TYPES.has(file.type)) {
-      throw new SupportAttachmentError('Поддерживаются JPG, PNG, WEBP и PDF.')
-    }
-
     const bytes = Buffer.from(await file.arrayBuffer())
-    if (!matchesDeclaredType(bytes, file.type)) {
-      throw new SupportAttachmentError('Тип прикреплённого файла не совпадает с его содержимым.')
-    }
-
-    return {
-      fileName: sanitizeFileName(file.name),
-      mimeType: file.type,
-      sizeBytes: file.size,
-      data: bytes,
-    }
+    return buildSupportAttachment({ fileName: file.name, mimeType: file.type, data: bytes })
   }))
+}
+
+// Программная проверка вложения (например, файл скачан из Telegram-бота):
+// те же лимиты и проверка сигнатур, что у загрузки из кабинета.
+export function buildSupportAttachment(input: { fileName: string; mimeType: string; data: Buffer }) {
+  if (input.data.length <= 0 || input.data.length > SUPPORT_ATTACHMENT_MAX_SIZE) {
+    throw new SupportAttachmentError('Размер каждого файла должен быть не больше 5 МБ.')
+  }
+  if (!ALLOWED_MIME_TYPES.has(input.mimeType)) {
+    throw new SupportAttachmentError('Поддерживаются JPG, PNG, WEBP и PDF.')
+  }
+  if (!matchesDeclaredType(input.data, input.mimeType)) {
+    throw new SupportAttachmentError('Тип прикреплённого файла не совпадает с его содержимым.')
+  }
+  return {
+    fileName: sanitizeFileName(input.fileName),
+    mimeType: input.mimeType,
+    sizeBytes: input.data.length,
+    data: input.data,
+  }
 }
 
 function isUploadedFile(value: FormDataEntryValue): value is File {

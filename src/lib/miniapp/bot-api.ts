@@ -17,3 +17,20 @@ export async function miniAppBotCall<T>(method: string, body: Record<string, unk
   }
   return data.result
 }
+
+// Скачивает файл бота (getFile → file/bot<token>/<path>) с жёстким лимитом размера.
+// Возвращает null, если файл недоступен или превышает лимит. Токен в URL не логируем.
+export async function downloadTelegramFile(fileId: string, maxBytes: number): Promise<Buffer | null> {
+  const meta = await miniAppBotCall<{ file_path?: string; file_size?: number }>('getFile', { file_id: fileId }).catch(() => null)
+  if (!meta?.file_path) return null
+  if (typeof meta.file_size === 'number' && meta.file_size > maxBytes) return null
+  const token = miniAppBotToken()
+  const response = await fetch(`https://api.telegram.org/file/bot${token}/${meta.file_path}`, {
+    signal: AbortSignal.timeout(15_000),
+    cache: 'no-store',
+  }).catch(() => null)
+  if (!response || !response.ok) return null
+  const bytes = Buffer.from(await response.arrayBuffer())
+  if (bytes.length <= 0 || bytes.length > maxBytes) return null
+  return bytes
+}

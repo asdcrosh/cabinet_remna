@@ -1,5 +1,5 @@
 import { createHash, timingSafeEqual } from 'node:crypto'
-import { miniAppBotCall } from './bot-api'
+import { downloadTelegramFile, miniAppBotCall } from './bot-api'
 import { miniAppUrl } from './config'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
@@ -19,6 +19,7 @@ import { displayCallbackScreen } from './callback-screen'
 import { clearBotDialogState, getBotDialogStateByTelegram, setBotDialogState } from './bot-dialog'
 import { closeTicketAsAdmin, closeTicketFromBot, createTicketFromBot, isSupportCategory, replyToTicketAsAdmin, replyToTicketFromBot } from './support-bot'
 import { supportCategories } from '@/lib/support'
+import { buildSupportAttachment, SUPPORT_ATTACHMENT_MAX_SIZE, SupportAttachmentError } from '@/lib/support-attachments'
 import { disableAutoRenewal } from '@/lib/auto-renewal'
 
 const user = z.object({ id: z.number().int().positive().safe() })
@@ -36,6 +37,8 @@ export const telegramUpdateSchema = z.object({
     caption: z.string().max(4096).optional(),
     photo: z.array(z.object({ file_id: z.string().max(256), width: z.number(), height: z.number(),
       file_size: z.number().optional() })).max(16).optional(),
+    document: z.object({ file_id: z.string().max(256), file_name: z.string().max(256).optional(),
+      mime_type: z.string().max(128).optional(), file_size: z.number().optional() }).optional(),
     successful_payment: z.object({ currency: z.string(), total_amount: z.number().int().positive(),
       invoice_payload: z.string().max(128), telegram_payment_charge_id: z.string().min(1).max(256) }).optional(),
     refunded_payment: z.object({ currency: z.string(), total_amount: z.number().int().positive(),
@@ -99,16 +102,20 @@ export async function isPendingBotDialogUpdate(value: unknown) {
   const text = Reflect.get(message, 'text')
   const photo = Reflect.get(message, 'photo')
   const hasPhoto = Array.isArray(photo) && photo.length > 0
+  const hasDocument = Boolean(Reflect.get(message, 'document'))
   if (!chat || typeof chat !== 'object' || !from || typeof from !== 'object') return false
-  if (typeof text !== 'string' && !hasPhoto) return false
+  if (typeof text !== 'string' && !hasPhoto && !hasDocument) return false
   if (Reflect.get(chat, 'type') !== 'private') return false
   const chatId = Reflect.get(chat, 'id')
   const fromId = Reflect.get(from, 'id')
   if (typeof chatId !== 'number' || typeof fromId !== 'number' || chatId !== fromId) return false
   const state = await getBotDialogStateByTelegram(fromId)
   if (!state) return false
-  // Фото без текста забираем только у рассылки: в поддержке снимков не ждём.
-  if (typeof text !== 'string') return state.startsWith('broadcast:')
+  // Медиа без поля text (подпись приходит в caption) забираем только там,
+  // где его ждут: рассылка и переписка поддержки.
+  if (typeof text !== 'string') {
+    return state.startsWith('broadcast:') || state.startsWith('support:') || state.startsWith('admin:reply:')
+  }
   return true
 }
 
@@ -456,7 +463,14 @@ export async function handleMiniAppUpdate(update: z.infer<typeof telegramUpdateS
   if (!message || message.chat.type !== 'private' || !message.from || message.chat.id !== message.from.id) return
   const text = message.text?.trim() ?? ''
   const caption = message.caption?.trim() ?? ''
-  const photoFileId = message.photo && message.photo.length > 0 ? message.photo[message.photo.length - 1]!.file_id : null
+  const photoSize = message.photo && message.photo.length > 0 ? message.photo[message.photo.length - 1]! : null
+  // Медиа диалога: документ (с именем и типом) или сжатое Telegram-фото (всегда JPEG).
+  const media: BotDialogMedia | null = message.document
+    ? { kind: 'document', fileId: message.document.file_id, fileName: message.document.file_name ?? 'document',
+      mimeType: message.document.mime_type ?? 'application/octet-stream', size: message.document.file_size ?? null }
+    : photoSize
+      ? { kind: 'photo', fileId: photoSize.file_id, fileName: 'photo.jpg', mimeType: 'image/jpeg', size: photoSize.file_size ?? null }
+      : null
   const dialogInput = text || caption
   const menu: Record<string, BotScreen> = {
     'Моя подписка': 'subscription', 'Мои устройства': 'devices', 'Пригласить друга': 'referrals', 'Поддержка': 'support',
@@ -465,12 +479,12 @@ export async function handleMiniAppUpdate(update: z.infer<typeof telegramUpdateS
   const menuScreen = menu[text]
   const isNavigation = Boolean(menuScreen) || text.startsWith('/')
   // Кнопки меню и команды отменяют ожидаемый ввод, свободный текст уходит в него.
-  // Рассылка ждёт и фото с подписью — оно приходит без поля text.
-  if (!isNavigation && (dialogInput || photoFileId)) {
+  // Рассылка и поддержка ждут и медиа с подписью — оно приходит без поля text.
+  if (!isNavigation && (dialogInput || media)) {
     const account = await prisma.user.findUnique({ where: { telegramId: BigInt(message.from.id) },
       select: { id: true, botDialog: { select: { state: true, payload: true } } } })
     if (account?.botDialog) {
-      await handleBotDialogMessage(message.chat.id, account.id, account.botDialog.state, dialogInput, message.message_id, account.botDialog.payload, photoFileId)
+      await handleBotDialogMessage(message.chat.id, account.id, account.botDialog.state, dialogInput, message.message_id, account.botDialog.payload, media)
       return
     }
   } else if (isNavigation) {
@@ -517,16 +531,37 @@ function checkoutUuid(callbackId: string) {
   return callbackUuid('avp-checkout', callbackId)
 }
 
+// Медиа, приложенное к сообщению диалога: сжатое фото Telegram или документ.
+type BotDialogMedia = { kind: 'photo' | 'document'; fileId: string; fileName: string; mimeType: string; size: number | null }
+
+// Скачивает приложенный файл и проверяет его правилами вложений поддержки.
+// Ошибка возвращается текстом — сообщение пользователя остаётся в чате для повтора.
+async function resolveBotSupportAttachment(media: BotDialogMedia | null | undefined) {
+  if (!media) return { attachment: null, error: null as string | null }
+  if (media.size && media.size > SUPPORT_ATTACHMENT_MAX_SIZE) {
+    return { attachment: null, error: 'Файл больше 5 МБ. Сожмите его или отправьте сообщение без вложения.' }
+  }
+  const bytes = await downloadTelegramFile(media.fileId, SUPPORT_ATTACHMENT_MAX_SIZE)
+  if (!bytes) return { attachment: null, error: 'Не удалось получить файл. Попробуйте отправить ещё раз.' }
+  try {
+    return { attachment: buildSupportAttachment({ fileName: media.fileName, mimeType: media.mimeType, data: bytes }), error: null }
+  } catch (e) {
+    return { attachment: null, error: e instanceof SupportAttachmentError ? e.message : 'Такой файл не поддерживается.' }
+  }
+}
+
 // Свободный текст в ожидаемом диалоге: новое обращение, ответ в тикет
 // или ответ администратора. Состояние сохраняется при ошибках валидации,
 // чтобы текст можно было исправить и отправить повторно. Успешно принятое
 // сообщение удаляется из чата — переписка живёт в одном обновляемом окне.
-async function handleBotDialogMessage(chatId: number, userId: string, state: string, text: string, sourceMessageId: number, payload?: string | null, imageFileId?: string | null) {
+async function handleBotDialogMessage(chatId: number, userId: string, state: string, text: string, sourceMessageId: number, payload?: string | null, media?: BotDialogMedia | null) {
   let html: string
   // Если у треда есть открытое окно — правим его на месте, новое сообщение не шлём.
   let editTarget: { ticketId: string; messageId: number; field: 'userBotMessageId' | 'adminBotMessageId' } | null = null
   // Сообщение принято в диалог — удаляем его из чата после рендера.
   let consumeMessage = false
+  // Для рассылки годится только фото (sendPhoto), документы остаются поддержке.
+  const imageFileId = media?.kind === 'photo' ? media.fileId : null
   if (state.startsWith('broadcast:text:') || state.startsWith('broadcast:preview:')) {
     const prefix = state.startsWith('broadcast:text:') ? 'broadcast:text:' : 'broadcast:preview:'
     const theme = findBroadcastTheme(state.slice(prefix.length))
@@ -562,7 +597,11 @@ async function handleBotDialogMessage(chatId: number, userId: string, state: str
       await clearBotDialogState(userId)
       html = await getBotScreen(chatId, 'support', 'Сессия обращения устарела. Начните заново.')
     } else {
-      const result = await createTicketFromBot(userId, category, text)
+      const { attachment, error: attachmentError } = await resolveBotSupportAttachment(media)
+      if (attachmentError) {
+        html = await getBotScreen(chatId, 'support', attachmentError)
+      } else {
+      const result = await createTicketFromBot(userId, category, text, attachment)
       if (result.ok && result.ticketId) {
         // Обращение создано — сразу открываем его окно и включаем живой режим:
         // следующие сообщения пользователя падают в этот же тред.
@@ -579,10 +618,16 @@ async function handleBotDialogMessage(chatId: number, userId: string, state: str
       } else {
         html = await getBotScreen(chatId, 'support', 'Не удалось открыть обращение. Попробуйте ещё раз.')
       }
+      }
     }
   } else if (state.startsWith('support:reply:')) {
     const ticketId = state.slice('support:reply:'.length)
-    const result = await replyToTicketFromBot(userId, ticketId, text)
+    const { attachment, error: attachmentError } = await resolveBotSupportAttachment(media)
+    if (attachmentError) {
+      // Вложение не принято: сообщение остаётся в чате, тред показывает причину.
+      html = await getBotSupportThreadScreen(chatId, ticketId, attachmentError)
+    } else {
+    const result = await replyToTicketFromBot(userId, ticketId, text, attachment)
     if (result.ok) {
       // Живой режим: состояние НЕ очищается — пиши дальше, окно обновляется на месте.
       consumeMessage = true
@@ -595,9 +640,14 @@ async function handleBotDialogMessage(chatId: number, userId: string, state: str
     } else {
       html = await getBotSupportThreadScreen(chatId, ticketId, result.error)
     }
+    }
   } else if (state.startsWith('admin:reply:')) {
     const ticketId = state.slice('admin:reply:'.length)
-    const result = await replyToTicketAsAdmin(userId, ticketId, text)
+    const { attachment, error: attachmentError } = await resolveBotSupportAttachment(media)
+    if (attachmentError) {
+      html = await getBotAdminThreadScreen(chatId, ticketId, attachmentError)
+    } else {
+    const result = await replyToTicketAsAdmin(userId, ticketId, text, attachment)
     if (result.ok) {
       consumeMessage = true
       html = await getBotAdminThreadScreen(chatId, ticketId, 'Ответ отправлен пользователю.')
@@ -608,6 +658,7 @@ async function handleBotDialogMessage(chatId: number, userId: string, state: str
       html = await getBotAdminTicketsScreen(chatId, result.error)
     } else {
       html = await getBotAdminThreadScreen(chatId, ticketId, result.error)
+    }
     }
   } else {
     await clearBotDialogState(userId)
