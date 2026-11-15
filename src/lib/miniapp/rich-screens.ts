@@ -299,11 +299,16 @@ export function buildSupportPromptScreen(input: RichScreenInput, prompt: { title
 
 // Диалог с поддержкой внутри бота: последние сообщения и действия с тикетом.
 // viewer 'admin' меняет подписи сторон и набор кнопок на административные.
-export function buildSupportThreadScreen(input: RichScreenInput, thread: { id: string; subject: string; status: string; userLabel?: string; messages: BotThreadMessage[] }, opts?: { viewer?: 'user' | 'admin' }) {
+export function buildSupportThreadScreen(input: RichScreenInput, thread: { id: string; subject: string; status: string; userLabel?: string; assigneeLabel?: string | null; rating?: 'up' | 'down' | null; messages: BotThreadMessage[] }, opts?: { viewer?: 'user' | 'admin' }) {
   const viewer = opts?.viewer ?? 'user'
   const parts = [brandHeader(input.bannerUrl), '<h3>🛟 Обращение</h3>',
     `<h4>${escape(thread.subject)}</h4>`,
-    table([...(thread.userLabel ? [['👤 Пользователь', thread.userLabel]] : []), ['Статус', thread.status]])]
+    table([
+      ...(thread.userLabel ? [['👤 Пользователь', thread.userLabel]] : []),
+      ...(viewer === 'admin' && thread.assigneeLabel ? [['🛠 Исполнитель', thread.assigneeLabel]] : []),
+      ['Статус', thread.status],
+      ...(thread.rating ? [[viewer === 'admin' ? 'Оценка пользователя' : 'Ваша оценка', thread.rating === 'up' ? '👍' : '👎']] : []),
+    ])]
   if (input.notice) parts.push(`<p>💬 ${escape(input.notice)}</p>`)
   if (!thread.messages.length) parts.push('<p>Сообщений пока нет.</p>')
   if (thread.messages.length) {
@@ -318,8 +323,15 @@ export function buildSupportThreadScreen(input: RichScreenInput, thread: { id: s
   }
   if (thread.status !== 'Закрыто') {
     parts.push('<p>✍️ Пишите ответ прямо в чат — следующее сообщение попадёт в обращение и появится здесь. Ваш текст после отправки убирается, переписка остаётся в этом окне. Можно приложить фото или файл.</p>')
-    if (viewer === 'admin') parts.push(row(cb('⚡ Быстрые ответы', `admq:${thread.id}`)))
+    if (viewer === 'admin') {
+      parts.push(row(cb('⚡ Быстрые ответы', `admq:${thread.id}`), cb('👤 Назначить', `adma:${thread.id}`)),
+        row(cb('📝 Заметка', `admn:${thread.id}`)))
+    }
     parts.push(row(cb('✅ Закрыть обращение', `${viewer === 'admin' ? 'admc' : 'supc'}:${thread.id}`)))
+  } else if (viewer === 'user' && !thread.rating && thread.messages.some(message => message.from === 'admin')) {
+    // Закрытое обращение с ответом поддержки: просим оценить работу.
+    parts.push('<p>Как вам ответ поддержки? Одно нажатие — и мы станем лучше.</p>',
+      row(cb('👍 Отлично', `rate:up:${thread.id}`, 'success'), cb('👎 Плохо', `rate:down:${thread.id}`, 'danger')))
   }
   parts.push(row(cb('◀️ К обращениям', viewer === 'admin' ? 'admt' : 'support')))
   return parts.join('')
@@ -336,6 +348,20 @@ export function buildAdminTemplatesScreen(input: RichScreenInput,
     parts.push(row(cb(template.label, `admqs:${thread.id}:${index}`)),
       `<p>${escape(template.text.length > 120 ? `${template.text.slice(0, 120)}…` : template.text)}</p>`)
   })
+  parts.push(row(cb('◀️ К обращению', `admt:${thread.id}`)))
+  return parts.join('')
+}
+
+// Выбор исполнителя обращения администратором.
+export function buildAdminAssignScreen(input: RichScreenInput,
+  thread: { id: string; subject: string },
+  admins: Array<{ id: string; label: string; current: boolean }>) {
+  const parts = [brandHeader(input.bannerUrl), '<h3>👤 Назначить исполнителя</h3>',
+    `<h4>${escape(thread.subject)}</h4>`,
+    '<p>Исполнитель виден команде в кабинете и в этом окне.</p>']
+  for (const admin of admins) {
+    parts.push(row(cb(`${admin.current ? '✅ ' : ''}${admin.label}`, `admas:${thread.id}:${admin.id}`)))
+  }
   parts.push(row(cb('◀️ К обращению', `admt:${thread.id}`)))
   return parts.join('')
 }

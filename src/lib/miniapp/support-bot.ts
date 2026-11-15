@@ -142,6 +142,65 @@ export async function replyToTicketAsAdmin(adminId: string, ticketId: string, me
   return { ok: true }
 }
 
+// Оценка закрытого обращения пользователем: один раз, 👍 = 5, 👎 = 1.
+export async function rateTicketFromBot(userId: string, ticketId: string, rating: 'up' | 'down'): Promise<BotSupportResult> {
+  const ticket = await prisma.supportTicket.findFirst({
+    where: { id: ticketId, userId },
+    select: { id: true, status: true, satisfactionRating: true },
+  })
+  if (!ticket) return { ok: false, error: 'Обращение не найдено.' }
+  if (ticket.status !== 'CLOSED') return { ok: false, error: 'Оценить можно только закрытое обращение.' }
+  if (ticket.satisfactionRating != null) return { ok: false, error: 'Оценка уже сохранена. Спасибо!' }
+  await prisma.supportTicket.update({
+    where: { id: ticket.id },
+    data: { satisfactionRating: rating === 'up' ? 5 : 1, ratedAt: new Date() },
+  })
+  // Оценка сразу видна администратору в окне треда.
+  await syncSupportThreadViews(ticket.id, { admin: true })
+  return { ok: true, ticketId: ticket.id }
+}
+
+// Назначение исполнителя обращения из бота.
+export async function assignTicketAsAdmin(adminId: string, ticketId: string, assigneeId: string): Promise<BotSupportResult> {
+  const admin = await prisma.user.findUnique({ where: { id: adminId }, select: { role: true } })
+  if (!admin || admin.role === 'USER') return { ok: false, error: 'Раздел доступен администраторам.' }
+  const ticket = await prisma.supportTicket.findUnique({ where: { id: ticketId }, select: { id: true, userId: true, status: true } })
+  if (!ticket) return { ok: false, error: 'Обращение не найдено.' }
+  if (ticket.status === 'CLOSED') return { ok: false, error: 'Обращение уже закрыто.' }
+  const assignee = await prisma.user.findUnique({ where: { id: assigneeId }, select: { id: true, role: true } })
+  if (!assignee || assignee.role === 'USER') return { ok: false, error: 'Администратор не найден.' }
+  await prisma.supportTicket.update({ where: { id: ticket.id }, data: { assigneeId: assignee.id, assignedAt: new Date() } })
+  await writeAuditLog({
+    actorId: adminId,
+    targetId: ticket.userId,
+    action: 'ADMIN_SUPPORT_UPDATED',
+    message: 'Администратор назначил исполнителя обращения из бота',
+    metadata: { ticketId: ticket.id, assigneeId: assignee.id },
+  })
+  await syncSupportThreadViews(ticket.id, { admin: true })
+  return { ok: true, ticketId: ticket.id }
+}
+
+// Внутренняя заметка к обращению из бота: видна только команде в кабинете.
+export async function addTicketNoteAsAdmin(adminId: string, ticketId: string, note: string): Promise<BotSupportResult> {
+  const admin = await prisma.user.findUnique({ where: { id: adminId }, select: { role: true } })
+  if (!admin || admin.role === 'USER') return { ok: false, error: 'Раздел доступен администраторам.' }
+  const text = note.trim()
+  if (!text) return { ok: false, error: 'Напишите текст заметки.' }
+  if (text.length > 1000) return { ok: false, error: 'Заметка слишком длинная. Сократите до 1000 символов.' }
+  const ticket = await prisma.supportTicket.findUnique({ where: { id: ticketId }, select: { id: true, userId: true } })
+  if (!ticket) return { ok: false, error: 'Обращение не найдено.' }
+  await prisma.supportInternalNote.create({ data: { ticketId: ticket.id, authorId: adminId, body: text } })
+  await writeAuditLog({
+    actorId: adminId,
+    targetId: ticket.userId,
+    action: 'ADMIN_SUPPORT_UPDATED',
+    message: 'Администратор добавил внутреннюю заметку из бота',
+    metadata: { ticketId: ticket.id },
+  })
+  return { ok: true, ticketId: ticket.id }
+}
+
 export async function closeTicketAsAdmin(adminId: string, ticketId: string): Promise<BotSupportResult> {
   const admin = await prisma.user.findUnique({ where: { id: adminId }, select: { role: true } })
   if (!admin || admin.role === 'USER') return { ok: false, error: 'Раздел доступен администраторам.' }

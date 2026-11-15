@@ -149,7 +149,7 @@ export async function getBotSupportThreadScreen(telegramId: number, ticketId: st
   const account = await prisma.user.findUnique({ where: { telegramId: BigInt(telegramId) }, select: { id: true } })
   const ticket = account ? await prisma.supportTicket.findFirst({
     where: { id: ticketId, userId: account.id },
-    select: { id: true, subject: true, status: true, updatedAt: true,
+    select: { id: true, subject: true, status: true, updatedAt: true, satisfactionRating: true,
       messages: { orderBy: { createdAt: 'desc' }, take: 6,
         select: { body: true, senderRole: true, createdAt: true, attachments: { select: { fileName: true } } } } },
   }) : null
@@ -163,7 +163,8 @@ export async function getBotSupportThreadScreen(telegramId: number, ticketId: st
     date: formatDate(message.createdAt),
     attachments: message.attachments.map(file => file.fileName),
   }))
-  return buildSupportThreadScreen(input, { id: ticket.id, subject: ticket.subject, status: ticketStatusLabel(ticket.status), messages })
+  return buildSupportThreadScreen(input, { id: ticket.id, subject: ticket.subject, status: ticketStatusLabel(ticket.status),
+    rating: ticket.satisfactionRating == null ? null : ticket.satisfactionRating >= 5 ? 'up' : 'down', messages })
 }
 
 
@@ -211,8 +212,9 @@ export async function getBotAdminThreadScreen(telegramId: number, ticketId: stri
   const ticket = await prisma.supportTicket.findUnique({
     where: { id: ticketId },
     select: {
-      id: true, subject: true, status: true,
+      id: true, subject: true, status: true, satisfactionRating: true,
       user: { select: { name: true, telegramUsername: true, email: true } },
+      assignee: { select: { name: true, telegramUsername: true, email: true } },
       messages: { orderBy: { createdAt: 'desc' }, take: 6,
         select: { body: true, senderRole: true, createdAt: true, attachments: { select: { fileName: true } } } },
     },
@@ -231,6 +233,8 @@ export async function getBotAdminThreadScreen(telegramId: number, ticketId: stri
     subject: ticket.subject,
     status: adminTicketStatusLabel(ticket.status),
     userLabel: adminUserLabel(ticket.user),
+    assigneeLabel: ticket.assignee ? adminUserLabel(ticket.assignee) : null,
+    rating: ticket.satisfactionRating == null ? null : ticket.satisfactionRating >= 5 ? 'up' : 'down',
     messages,
   }, { viewer: 'admin' })
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { buildAdminTemplatesScreen, buildAdminTicketsScreen, buildAutoRenewalOffConfirm, buildDeviceDeleteConfirm, buildDeviceScreen, buildRichPaymentScreen, buildRichScreen, buildSpinResultScreen, buildSupportCategoryScreen, buildSupportPromptScreen, buildSupportThreadScreen } from './rich-screens'
+import { buildAdminAssignScreen, buildAdminTemplatesScreen, buildAdminTicketsScreen, buildAutoRenewalOffConfirm, buildDeviceDeleteConfirm, buildDeviceScreen, buildRichPaymentScreen, buildRichScreen, buildSpinResultScreen, buildSupportCategoryScreen, buildSupportPromptScreen, buildSupportThreadScreen } from './rich-screens'
 import { channelCampaign, isChannelMember, isChannelReference } from './channel-referrals'
 import { miniAppDemo } from './model'
 import { isMiniAppOwnedUpdate, isPaymentUpdate, isUnsupportedPaymentUpdate, isUnsupportedCallback, telegramUpdateSchema, validWebhookSecret } from './bot'
@@ -135,6 +135,16 @@ describe('Telegram Mini App boundaries', () => {
     expect(thread).toContain('🛟 Поддержка')
     expect(thread).toContain('Пишите ответ прямо в чат')
     expect(thread).toContain('avp:supc:ticket-1')
+    const closed = buildSupportThreadScreen({ screen: 'support', overview: miniAppDemo, appUrl },
+      { id: 'ticket-1', subject: 'Проблема с подключением', status: 'Закрыто',
+        messages: [{ from: 'admin', body: 'Попробуйте переподключиться', date: '01.11.2026' }] })
+    expect(closed).toContain('avp:rate:up:ticket-1')
+    expect(closed).toContain('avp:rate:down:ticket-1')
+    const rated = buildSupportThreadScreen({ screen: 'support', overview: miniAppDemo, appUrl },
+      { id: 'ticket-1', subject: 'Проблема с подключением', status: 'Закрыто', rating: 'up',
+        messages: [{ from: 'admin', body: 'Попробуйте переподключиться', date: '01.11.2026' }] })
+    expect(rated).toContain('Ваша оценка')
+    expect(rated).not.toContain('avp:rate:up:ticket-1')
     const connect = buildRichScreen({ screen: 'connect', overview: miniAppDemo, appUrl,
       connectUrl: 'https://panel.example.test/sub/abc123' })
     expect(connect).toContain('type="copy_text"')
@@ -168,7 +178,15 @@ describe('Telegram Mini App boundaries', () => {
     expect(thread).toContain('@ivan')
     expect(thread).toContain('Пишите ответ прямо в чат')
     expect(thread).toContain('avp:admq:ticket-1')
+    expect(thread).toContain('avp:adma:ticket-1')
+    expect(thread).toContain('avp:admn:ticket-1')
     expect(thread).toContain('avp:admc:ticket-1')
+    const assign = buildAdminAssignScreen({ screen: 'admin', overview: miniAppDemo, appUrl },
+      { id: 'ticket-1', subject: 'Проблема с подключением' },
+      [{ id: 'admin-1', label: '@ivan', current: true }])
+    expect(assign).toContain('avp:admas:ticket-1:admin-1')
+    expect(assign).toContain('✅ @ivan')
+    expect(assign).toContain('avp:admt:ticket-1')
     const templates = buildAdminTemplatesScreen({ screen: 'admin', overview: miniAppDemo, appUrl },
       { id: 'ticket-1', subject: 'Проблема с подключением' },
       [{ label: '🔄 Переподключение', text: 'Добавьте подписку заново.' }])

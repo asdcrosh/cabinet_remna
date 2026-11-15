@@ -4,7 +4,7 @@ import { miniAppUrl } from './config'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { getBotAdminThreadScreen, getBotAdminTicketsScreen, getBotBroadcastThemesScreen, getBotPaymentScreen, getBotScreen, getBotScreenInput, getBotSupportThreadScreen } from './bot-screens'
-import { botScreens, buildAdminTemplatesScreen, buildAutoRenewalOffConfirm, buildBroadcastPreviewScreen, buildBroadcastPromptScreen, buildBroadcastSentScreen, buildDeviceDeleteConfirm, buildDeviceScreen, buildSpinResultScreen, buildSupportCategoryScreen, buildSupportPromptScreen, buildWhatsNewScreen, type BotScreen } from './rich-screens'
+import { botScreens, buildAdminAssignScreen, buildAdminTemplatesScreen, buildAutoRenewalOffConfirm, buildBroadcastPreviewScreen, buildBroadcastPromptScreen, buildBroadcastSentScreen, buildDeviceDeleteConfirm, buildDeviceScreen, buildSpinResultScreen, buildSupportCategoryScreen, buildSupportPromptScreen, buildWhatsNewScreen, type BotScreen } from './rich-screens'
 import { broadcastThemeView, createBotBroadcast, findBroadcastTheme, parseBroadcastDraft, serializeBroadcastDraft, validateBroadcastText } from './broadcast-bot'
 import { claimChannelReward } from './channel-referrals'
 import { unbindUserDevice } from '@/lib/device-unbind'
@@ -17,7 +17,7 @@ import { rateLimitKey } from '@/lib/rate-limit'
 import { answerStarsPreCheckout, isOurStarsPayload, refundStarsPayment, settleStarsPayment } from './stars-payments'
 import { displayCallbackScreen } from './callback-screen'
 import { clearBotDialogState, getBotDialogStateByTelegram, setBotDialogState } from './bot-dialog'
-import { closeTicketAsAdmin, closeTicketFromBot, createTicketFromBot, isSupportCategory, replyToTicketAsAdmin, replyToTicketFromBot } from './support-bot'
+import { addTicketNoteAsAdmin, assignTicketAsAdmin, closeTicketAsAdmin, closeTicketFromBot, createTicketFromBot, isSupportCategory, rateTicketFromBot, replyToTicketAsAdmin, replyToTicketFromBot } from './support-bot'
 import { supportReplyTemplates } from './support-templates'
 import { supportCategories } from '@/lib/support'
 import { buildSupportAttachment, SUPPORT_ATTACHMENT_MAX_SIZE, SupportAttachmentError } from '@/lib/support-attachments'
@@ -424,6 +424,95 @@ export async function handleMiniAppUpdate(update: z.infer<typeof telegramUpdateS
       await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
       return
     }
+    // Оценка закрытого обращения пользователем.
+    if (action.startsWith('rate:up:') || action.startsWith('rate:down:')) {
+      const rating = action.startsWith('rate:up:') ? 'up' as const : 'down' as const
+      const ticketId = action.slice(rating === 'up' ? 8 : 10)
+      const account = await prisma.user.findUnique({ where: { telegramId: BigInt(callback.from.id) }, select: { id: true } })
+      const result = account
+        ? await rateTicketFromBot(account.id, ticketId, rating)
+        : { ok: false as const, error: 'Сначала войдите в приложение через Telegram' }
+      const html = await getBotSupportThreadScreen(callback.from.id, ticketId,
+        result.ok ? 'Спасибо за оценку! Она помогает нам становиться лучше.' : result.error)
+      const used = await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
+      if (account && used) {
+        await prisma.supportTicket.updateMany({ where: { id: ticketId, userId: account.id }, data: { userBotMessageId: used } })
+      }
+      return
+    }
+    // Выбор исполнителя обращения.
+    if (action.startsWith('adma:')) {
+      const ticketId = action.slice(5)
+      const account = await prisma.user.findUnique({ where: { telegramId: BigInt(callback.from.id) }, select: { id: true, role: true } })
+      if (account && account.role !== 'USER') {
+        const [ticket, admins] = await Promise.all([
+          prisma.supportTicket.findUnique({ where: { id: ticketId }, select: { subject: true, status: true, assigneeId: true } }),
+          prisma.user.findMany({ where: { role: { not: 'USER' } }, orderBy: { createdAt: 'asc' }, take: 10,
+            select: { id: true, name: true, telegramUsername: true, email: true } }),
+        ])
+        if (ticket && ticket.status !== 'CLOSED') {
+          const html = buildAdminAssignScreen(await getBotScreenInput(callback.from.id, 'admin'),
+            { id: ticketId, subject: ticket.subject },
+            admins.map(admin => ({
+              id: admin.id,
+              label: admin.name?.split(' ')[0] || (admin.telegramUsername ? `@${admin.telegramUsername}` : admin.email),
+              current: ticket.assigneeId === admin.id,
+            })))
+          const used = await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
+          if (used) {
+            await prisma.supportTicket.updateMany({ where: { id: ticketId },
+              data: { adminBotChatId: BigInt(callback.from.id), adminBotMessageId: used } })
+          }
+          return
+        }
+      }
+      const html = await getBotAdminTicketsScreen(callback.from.id, 'Обращение не найдено или уже закрыто.')
+      await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
+      return
+    }
+    if (action.startsWith('admas:')) {
+      const rest = action.slice(6)
+      const sep = rest.lastIndexOf(':')
+      const ticketId = sep > 0 ? rest.slice(0, sep) : ''
+      const assigneeId = sep > 0 ? rest.slice(sep + 1) : ''
+      const account = await prisma.user.findUnique({ where: { telegramId: BigInt(callback.from.id) }, select: { id: true, role: true } })
+      if (account && account.role !== 'USER' && ticketId && assigneeId) {
+        const result = await assignTicketAsAdmin(account.id, ticketId, assigneeId)
+        const html = await getBotAdminThreadScreen(callback.from.id, ticketId,
+          result.ok ? '👤 Исполнитель назначен.' : result.error)
+        const used = await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
+        if (used) {
+          await prisma.supportTicket.updateMany({ where: { id: ticketId },
+            data: { adminBotChatId: BigInt(callback.from.id), adminBotMessageId: used } })
+        }
+        return
+      }
+      const html = await getBotAdminTicketsScreen(callback.from.id, 'Не удалось назначить исполнителя.')
+      await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
+      return
+    }
+    // Внутренняя заметка: следующее сообщение админа уйдёт в заметки тикета.
+    if (action.startsWith('admn:')) {
+      const ticketId = action.slice(5)
+      const account = await prisma.user.findUnique({ where: { telegramId: BigInt(callback.from.id) }, select: { id: true, role: true } })
+      const ticket = account && account.role !== 'USER'
+        ? await prisma.supportTicket.findUnique({ where: { id: ticketId }, select: { status: true } })
+        : null
+      if (account && ticket) {
+        await setBotDialogState(account.id, `admin:note:${ticketId}`)
+        const html = await getBotAdminThreadScreen(callback.from.id, ticketId,
+          '📝 Следующее сообщение станет внутренней заметкой — её увидит только команда в кабинете.')
+        const used = await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
+        if (used) {
+          await prisma.supportTicket.updateMany({ where: { id: ticketId },
+            data: { adminBotChatId: BigInt(callback.from.id), adminBotMessageId: used } })
+        }
+        return
+      }
+      const html = await getBotAdminTicketsScreen(callback.from.id, 'Обращение не найдено.')
+      await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
+      return
+    }
     if (action === 'admt') {
       const html = await getBotAdminTicketsScreen(callback.from.id)
       const used = await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
@@ -730,6 +819,24 @@ async function handleBotDialogMessage(chatId: number, userId: string, state: str
     } else {
       html = await getBotAdminThreadScreen(chatId, ticketId, result.error)
     }
+    }
+  } else if (state.startsWith('admin:note:')) {
+    const ticketId = state.slice('admin:note:'.length)
+    const result = await addTicketNoteAsAdmin(userId, ticketId, text)
+    if (result.ok) {
+      consumeMessage = true
+      // Заметка сохранена — возвращаем живой режим переписки, если тикет ещё открыт.
+      const ticket = await prisma.supportTicket.findUnique({ where: { id: ticketId }, select: { status: true } })
+      if (ticket && ticket.status !== 'CLOSED') await setBotDialogState(userId, `admin:reply:${ticketId}`)
+      else await clearBotDialogState(userId)
+      html = await getBotAdminThreadScreen(chatId, ticketId, '📝 Заметка сохранена. Её видит только команда в кабинете.')
+      const anchor = await prisma.supportTicket.findUnique({ where: { id: ticketId }, select: { adminBotMessageId: true } })
+      editTarget = anchor?.adminBotMessageId ? { ticketId, messageId: anchor.adminBotMessageId, field: 'adminBotMessageId' as const } : null
+    } else if (result.error.includes('доступен') || result.error.includes('не найдено')) {
+      await clearBotDialogState(userId)
+      html = await getBotAdminTicketsScreen(chatId, result.error)
+    } else {
+      html = await getBotAdminThreadScreen(chatId, ticketId, result.error)
     }
   } else {
     await clearBotDialogState(userId)

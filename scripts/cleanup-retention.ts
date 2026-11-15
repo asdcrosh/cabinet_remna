@@ -14,6 +14,10 @@ async function main() {
   const expiredTokenDays = readDays('EXPIRED_TOKEN_RETENTION_DAYS', 7)
   const batchSize = readBatchSize()
 
+  // Автозакрытие обращений, где поддержка ответила, а пользователь молчит.
+  const autocloseDays = readDays('SUPPORT_AUTOCLOSE_DAYS', 7)
+  const autoClosedTickets = await autoCloseStaleSupportTickets(daysAgo(now, autocloseDays), batchSize)
+
   const [
     expiredRateLimits,
     expiredRevokedSessions,
@@ -125,8 +129,33 @@ async function main() {
     expiredPasswordResetTokens: expiredPasswordResetTokens.count,
     oldUserNotifications: oldUserNotifications.count,
     oldClosedSupportTickets: oldClosedSupportTickets.count,
+    autoClosedTickets: autoClosedTickets.count,
     batchSize,
   })
+}
+
+// Закрывает обращения в статусе «ждём пользователя» без активности дольше лимита.
+// Окна переписки в боте обновляются на месте и показывают «Закрыто».
+async function autoCloseStaleSupportTickets(olderThan: Date, batchSize: number) {
+  const stale = await prisma.supportTicket.findMany({
+    where: { status: 'WAITING_USER', lastMessageAt: { lt: olderThan } },
+    select: { id: true },
+    take: batchSize,
+  })
+  let count = 0
+  for (const ticket of stale) {
+    const updated = await prisma.supportTicket.updateMany({
+      where: { id: ticket.id, status: 'WAITING_USER' },
+      data: { status: 'CLOSED', closedAt: new Date() },
+    })
+    if (updated.count !== 1) continue
+    count += 1
+    try {
+      const { syncSupportThreadViews } = await import('../src/lib/miniapp/support-sync')
+      await syncSupportThreadViews(ticket.id, { user: true, admin: true })
+    } catch { /* миниапп-бот может быть не настроен */ }
+  }
+  return { count }
 }
 
 async function deleteInBatches(

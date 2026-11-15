@@ -1655,6 +1655,9 @@ model SupportTicket {
   userBotMessageId  Int?
   adminBotChatId    BigInt?
   adminBotMessageId Int?
+  /// Оценка ответа поддержки пользователем: 1 = 👎, 5 = 👍
+  satisfactionRating Int?
+  ratedAt            DateTime?
 
   user          User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
   assignee      User?                 @relation("SupportTicketAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
