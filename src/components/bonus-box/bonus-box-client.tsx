@@ -85,6 +85,9 @@ export function BonusBoxClient({
 }) {
   const [data, setData] = useState(initialData);
   const [attemptsOpen, setAttemptsOpen] = useState(false);
+  // Триггер диалога «Попытки закончились»: WebKit не фокусирует кнопку по клику,
+  // поэтому возвращаем фокус на неё явно через returnFocusRef модалки.
+  const getAttemptsCtaRef = useRef<HTMLButtonElement | null>(null);
   const [rouletteItems, setRouletteItems] = useState(() => buildIdleRoulette(initialData.prizes));
   const [roulettePhase, setRoulettePhase] = useState<RoulettePhase>("idle");
   const [spinError, setSpinError] = useState("");
@@ -668,7 +671,7 @@ export function BonusBoxClient({
   }
 
   const openCaseCta = noAttempts && !opening ? (
-    <button type="button" className={cn(openButtonClass, "w-full")} onClick={() => setAttemptsOpen(true)}>
+    <button type="button" ref={getAttemptsCtaRef} className={cn(openButtonClass, "w-full")} onClick={() => setAttemptsOpen(true)}>
       <Gift className="mr-2 h-4 w-4" />
       Нет попыток · Получить
     </button>
@@ -896,6 +899,7 @@ export function BonusBoxClient({
 
       <Modal
         open={attemptsOpen}
+        returnFocusRef={getAttemptsCtaRef}
         title={noAttempts ? "Попытки закончились" : "Получить попытки"}
         description="Получайте попытки за покупки и активность."
         onClose={() => setAttemptsOpen(false)}

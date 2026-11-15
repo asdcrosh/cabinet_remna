@@ -20,6 +20,10 @@ export interface ModalProps {
   panelClassName?: string
   bodyClassName?: string
   initialFocusRef?: React.RefObject<HTMLElement | null>
+  // Элемент, которому возвращается фокус при закрытии. Нужен там, где триггер
+  // нельзя надёжно определить через document.activeElement: WebKit не фокусирует
+  // кнопку по клику, поэтому активным остаётся body.
+  returnFocusRef?: React.RefObject<HTMLElement | null>
 }
 
 export function Modal({
@@ -34,6 +38,7 @@ export function Modal({
   panelClassName,
   bodyClassName,
   initialFocusRef,
+  returnFocusRef,
 }: ModalProps) {
   const [mounted, setMounted] = React.useState(false)
   const titleId = React.useId()
@@ -55,6 +60,8 @@ export function Modal({
     const layerId = dialogLayerRef.current
     const unregisterLayer = registerDialogLayer(layerId)
     previouslyFocusedRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    // Значение ref фиксируем при открытии: к cleanup оно может измениться.
+    const returnFocusTarget = returnFocusRef?.current ?? null
 
     window.setTimeout(() => {
       const preferred = initialFocusRef?.current
@@ -94,10 +101,15 @@ export function Modal({
     return () => {
       window.removeEventListener('keydown', onKeyDown)
       unregisterLayer()
-      previouslyFocusedRef.current?.focus()
+      const previouslyFocused = returnFocusTarget ?? previouslyFocusedRef.current
       previouslyFocusedRef.current = null
+      // Фокус возвращаем асинхронно: синхронный вызов в cleanup WebKit
+      // перезаписывает при удалении портала диалога из DOM.
+      if (previouslyFocused?.isConnected) {
+        window.setTimeout(() => previouslyFocused.focus(), 0)
+      }
     }
-  }, [initialFocusRef, open])
+  }, [initialFocusRef, open, returnFocusRef])
 
   if (!mounted || !open) return null
 
