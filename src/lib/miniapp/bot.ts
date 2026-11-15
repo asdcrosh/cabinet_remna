@@ -670,7 +670,7 @@ export async function handleMiniAppUpdate(update: z.infer<typeof telegramUpdateS
     await miniAppBotCall('deleteMessage', { chat_id: message.chat.id, message_id: message.message_id }).catch(() => {})
     // Анимация «печатает…», пока экран собирается.
     await miniAppBotCall('sendChatAction', { chat_id: message.chat.id, action: 'typing' }).catch(() => {})
-    await showBotScreen(message.chat.id, await getBotScreen(message.from.id, menuScreen))
+    await showBotScreen(message.chat.id, await getBotScreen(message.from.id, menuScreen), message.message_id)
     return
   }
   const command = message.text?.split(/\s+/)[0]?.split('@')[0]
@@ -691,7 +691,7 @@ export async function handleMiniAppUpdate(update: z.infer<typeof telegramUpdateS
     if (account && account.role !== 'USER') {
       const html = await getBotAdminThreadScreen(message.from.id, adminThreadTicketId)
       await miniAppBotCall('deleteMessage', { chat_id: message.chat.id, message_id: message.message_id }).catch(() => {})
-      const used = await showBotScreen(message.chat.id, html)
+      const used = await showBotScreen(message.chat.id, html, message.message_id)
       if (used) {
         // Как при открытии из очереди: якорь окна и живой режим ответа.
         await prisma.$transaction([
@@ -717,7 +717,7 @@ export async function handleMiniAppUpdate(update: z.infer<typeof telegramUpdateS
     const html = command === '/start' && startPayload === 'update'
       ? buildWhatsNewScreen(await getBotScreenInput(message.from.id, 'home'))
       : await getBotScreen(message.from.id, section as BotScreen, undefined, referral)
-    await showBotScreen(message.chat.id, html)
+    await showBotScreen(message.chat.id, html, message.message_id)
     return
   }
   if (process.env.TELEGRAM_WIDGETS_ENABLED === 'true' && command === '/start') {
@@ -908,7 +908,7 @@ async function handleBotDialogMessage(chatId: number, userId: string, state: str
     }
     return
   }
-  await showBotScreen(chatId, html)
+  await showBotScreen(chatId, html, sourceMessageId)
 }
 
 function callbackUuid(salt: string, callbackId: string) {

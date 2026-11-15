@@ -60,4 +60,15 @@ describe('Telegram /start в едином окне', () => {
       chat_id: 123, message_id: 555, rich_message: { html: '<h3>🏠 Главная</h3>' } }))
     expect(mocks.botCall.mock.calls.some(([method]) => method === 'sendRichMessage')).toBe(false)
   })
+
+  it('окно, уехавшее вверх по истории, удаляется — экран показывается свежим внизу', async () => {
+    mocks.findFirstUser.mockResolvedValue({ botScreenMessageId: 5 }) // давно похоронено под другими сообщениями
+    await handleMiniAppUpdate({ update_id: 3, message: { message_id: 100, from: { id: 123 },
+      chat: { id: 123, type: 'private' }, text: '/start' } })
+
+    expect(mocks.botCall).toHaveBeenCalledWith('deleteMessage', { chat_id: 123, message_id: 5 })
+    expect(mocks.botCall.mock.calls.some(([method]) => method === 'editMessageText')).toBe(false)
+    expect(mocks.botCall.mock.calls.some(([method]) => method === 'sendRichMessage')).toBe(true)
+    expect(mocks.updateManyUser).toHaveBeenCalledWith(expect.objectContaining({ data: { botScreenMessageId: 901 } }))
+  })
 })

@@ -37,14 +37,23 @@ async function rememberBotScreenAnchor(chatId: number, messageId: number) {
 
 // Показ экрана в ответ на текст пользователя (меню, команды): правим
 // запомненное окно, а если его ещё нет — отправляем и запоминаем.
-export async function showBotScreen(chatId: number, html: string): Promise<number | null> {
+// nearMessageId — id сообщения пользователя, на которое отвечаем: если окно
+// уехало далеко вверх по истории (уведомления, старые экраны), править его
+// бессмысленно — пользователь не увидит. Устаревшее окно удаляем, экран
+// показываем свежим сообщением внизу чата.
+export async function showBotScreen(chatId: number, html: string, nearMessageId?: number): Promise<number | null> {
   const anchor = await prisma.user.findFirst({
     where: { telegramId: BigInt(chatId), botScreenMessageId: { not: null } },
     select: { botScreenMessageId: true },
   }).catch(() => null)
-  if (anchor?.botScreenMessageId) {
-    const used = await displayCallbackScreen(chatId, anchor.botScreenMessageId, html)
+  const anchorId = anchor?.botScreenMessageId ?? null
+  const stale = anchorId != null && nearMessageId != null && anchorId < nearMessageId - 3
+  if (anchorId != null && !stale) {
+    const used = await displayCallbackScreen(chatId, anchorId, html)
     if (used) return used
+  }
+  if (stale && anchorId != null) {
+    await miniAppBotCall('deleteMessage', { chat_id: chatId, message_id: anchorId }).catch(() => {})
   }
   // Reply-клавиатуру легаси-меню убираем служебным сообщением и сразу удаляем его:
   // сообщение, отправленное с ReplyKeyboardRemove, Telegram не даёт редактировать,
