@@ -4,7 +4,7 @@ import { miniAppUrl } from './config'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { getBotAdminThreadScreen, getBotAdminTicketsScreen, getBotBroadcastThemesScreen, getBotPaymentScreen, getBotScreen, getBotScreenInput, getBotSupportThreadScreen } from './bot-screens'
-import { botScreens, buildAutoRenewalOffConfirm, buildBroadcastPreviewScreen, buildBroadcastPromptScreen, buildBroadcastSentScreen, buildDeviceDeleteConfirm, buildDeviceScreen, buildSpinResultScreen, buildSupportCategoryScreen, buildSupportPromptScreen, type BotScreen } from './rich-screens'
+import { botScreens, buildAutoRenewalOffConfirm, buildBroadcastPreviewScreen, buildBroadcastPromptScreen, buildBroadcastSentScreen, buildDeviceDeleteConfirm, buildDeviceScreen, buildSpinResultScreen, buildSupportCategoryScreen, buildSupportPromptScreen, buildWhatsNewScreen, type BotScreen } from './rich-screens'
 import { broadcastThemeView, createBotBroadcast, findBroadcastTheme, parseBroadcastDraft, serializeBroadcastDraft, validateBroadcastText } from './broadcast-bot'
 import { claimChannelReward } from './channel-referrals'
 import { unbindUserDevice } from '@/lib/device-unbind'
@@ -83,7 +83,7 @@ export function isMiniAppOwnedUpdate(value: unknown) {
   if (typeof content !== 'string') return false
   if (['Моя подписка', 'Мои устройства', 'Пригласить друга', 'Поддержка'].includes(content)) return true
   return /^\/(?:app|menu|subscription|connect|plans|billing|devices|bonus|notifications|referrals|settings|admin|support|paysupport|help)(?:@[A-Za-z0-9_]+)?(?:\s|$)/.test(content)
-    || /^\/start(?:@[A-Za-z0-9_]+)?(?:\s+ref_[A-Z0-9]{6,8})?$/.test(content)
+    || /^\/start(?:@[A-Za-z0-9_]+)?(?:\s+(?:ref_[A-Z0-9]{6,8}|update))?$/.test(content)
 }
 
 // Произвольный текст принадлежит новому боту, если пользователя ждёт ввод
@@ -441,11 +441,16 @@ export async function handleMiniAppUpdate(update: z.infer<typeof telegramUpdateS
   }
   const section = menuScreen || commands[command || '']
   if (!section) return
-  const referral = message.text?.match(/^\/start(?:@[a-zA-Z0-9_]+)? ref_([A-Z0-9]{6,8})$/)?.[1]
+  const startPayload = message.text?.match(/^\/start(?:@[a-zA-Z0-9_]+)?(?:\s+(.+))?$/)?.[1]?.trim()
+  const referral = startPayload?.match(/^ref_([A-Z0-9]{6,8})$/)?.[1]
   const content = welcomeMessage(section, referral)
   if (process.env.TELEGRAM_RICH_MESSAGES_ENABLED === 'true') {
+    // Переход по ссылке из анонса в канале встречаем экраном новых возможностей.
+    const html = command === '/start' && startPayload === 'update'
+      ? buildWhatsNewScreen(await getBotScreenInput(message.from.id, 'home'))
+      : await getBotScreen(message.from.id, section as BotScreen, undefined, referral)
     await miniAppBotCall('sendRichMessage', { chat_id: message.chat.id,
-      rich_message: { html: await getBotScreen(message.from.id, section as BotScreen, undefined, referral) },
+      rich_message: { html },
       protect_content: true, reply_markup: { remove_keyboard: true } })
     return
   }

@@ -21,6 +21,7 @@ describe('Telegram Mini App boundaries', () => {
     expect(isMiniAppOwnedUpdate({ callback_query: { data: 'avp:devices' } })).toBe(true)
     expect(isMiniAppOwnedUpdate({ message: { text: '/start legacy_campaign' } })).toBe(false)
     expect(isMiniAppOwnedUpdate({ message: { text: '/start ref_ABC123' } })).toBe(true)
+    expect(isMiniAppOwnedUpdate({ message: { text: '/start update' } })).toBe(true)
     expect(isMiniAppOwnedUpdate({ message: { text: '/support' } })).toBe(true)
     expect(telegramUpdateSchema.safeParse({ update_id: 1, message: { chat: { id: 123, type: 'private' }, from: { id: 123 }, text: '/start' } }).success).toBe(true)
     expect(telegramUpdateSchema.safeParse({ update_id: 2, message: { chat: { id: 123, type: 'private' }, from: { id: 123 },

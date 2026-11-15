@@ -217,6 +217,29 @@ export function buildRichScreen(input: RichScreenInput) {
   return parts.join('')
 }
 
+// Экран «что нового» для переходов по ссылке /start update из анонса в канале.
+export function buildWhatsNewScreen(input: RichScreenInput) {
+  const parts = [brandHeader(input.bannerUrl), '<h3>⚡️ Обновление: всё главное — прямо в боте</h3>',
+    '<p>Больше не нужно заходить в кабинет за каждой мелочью. Самое нужное делается прямо в чате — быстро и в пару тапов:</p>',
+    table([
+      ['💳 Оплата', 'Карта и СБП — внутри Telegram, чек показываем перед оплатой'],
+      ['🛟 Поддержка', 'Обращение и переписка — как обычный чат'],
+      ['🔌 Подключение', 'Ссылка подписки копируется в один тап'],
+      ['⚙️ Настройки', 'Каналы уведомлений переключаются кнопками'],
+      ['💰 Биллинг и бонусы', 'Автопродление и промокоды под рукой'],
+    ]),
+    row(cb('🔌 Подключить VPN', 'connect', 'success'), cb('💎 Тарифы', 'plans')),
+    row(cb('💳 Платежи', 'billing'), cb('🎁 Бонусы', 'bonus')),
+    row(cb('🛟 Поддержка', 'support'), cb('⚙️ Настройки', 'settings'))]
+  if (input.overview) {
+    parts.push(row(cb('🏠 На главную', 'home')))
+  } else {
+    parts.push('<p>Войдите через Telegram, чтобы бот показал вашу подписку.</p>',
+      row(cb('🏠 На главную', 'home', 'success')))
+  }
+  return parts.join('')
+}
+
 // Карточка устройства: понятно, чем управляешь, прежде чем удалять.
 export function buildDeviceScreen(input: RichScreenInput, device: BotDevice) {
   const parts = [brandHeader(input.bannerUrl), '<h3>📱 Устройство</h3>',
