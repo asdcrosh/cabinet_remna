@@ -389,6 +389,9 @@ model AdminTelegramDelivery {
   text              String
   actionHref        String?
   actionLabel       String?
+  /// Вторая кнопка-ссылка (например, deep link «Открыть в боте»)
+  actionHref2       String?
+  actionLabel2      String?
   status            AdminTelegramDeliveryStatus @default(PENDING)
   attempts          Int                         @default(0)
   nextRetryAt       DateTime                    @default(now())

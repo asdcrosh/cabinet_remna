@@ -134,6 +134,28 @@ describe('admin Telegram notifications', () => {
     }))
   })
 
+  it('adds a plain link button when the delivery has a second action', async () => {
+    mocks.findMany.mockResolvedValue([{
+      id: 'delivery-2',
+      text: '<b>🆘 Новое обращение</b>',
+      actionHref: '/dashboard/admin/support?q=ticket-1',
+      actionLabel: 'Открыть и ответить',
+      actionHref2: 'https://t.me/alekseevVP_bot?start=admt_ticket-1',
+      actionLabel2: '💬 Открыть в боте',
+      attempts: 0,
+    }])
+
+    const result = await processAdminTelegramDeliveries()
+
+    expect(result).toEqual({ configured: true, attempted: 1, sent: 1, retried: 0, failed: 0 })
+    const request = (fetch as ReturnType<typeof vi.fn>).mock.calls[0]?.[1] as RequestInit
+    const payload = JSON.parse(String(request.body))
+    expect(payload.reply_markup.inline_keyboard).toEqual([
+      [{ text: 'Открыть и ответить', web_app: { url: 'https://cabinet.example.test/dashboard/admin/support?q=ticket-1' } }],
+      [{ text: '💬 Открыть в боте', url: 'https://t.me/alekseevVP_bot?start=admt_ticket-1' }],
+    ])
+  })
+
   it('keeps a failed delivery retryable without throwing into the payment flow', async () => {
     mocks.findMany.mockResolvedValue([{
       id: 'delivery-1',

@@ -168,6 +168,10 @@ async function notifyAdmins(userId: string, kind: 'ticket' | 'message', ticketId
     where: { id: userId },
     select: { name: true, email: true, telegramUsername: true },
   })
+  // Deep link в миниапп-бота: уведомление открывает тред прямо в чате бота.
+  const miniAppBot = process.env.TELEGRAM_MINIAPP_ENABLED === 'true'
+    ? process.env.TELEGRAM_MINIAPP_BOT_USERNAME?.trim().replace(/^@/, '')
+    : null
   await createAdminNotification({
     type: 'support',
     severity: 'INFO',
@@ -191,6 +195,9 @@ async function notifyAdmins(userId: string, kind: 'ticket' | 'message', ticketId
             }),
             actionHref: `/dashboard/admin/support?q=${encodeURIComponent(ticketId)}`,
             actionLabel: 'Открыть и ответить',
+            ...(miniAppBot
+              ? { actionHref2: `https://t.me/${miniAppBot}?start=admt_${ticketId}`, actionLabel2: '💬 Открыть в боте' }
+              : {}),
           },
         }
       : {}),

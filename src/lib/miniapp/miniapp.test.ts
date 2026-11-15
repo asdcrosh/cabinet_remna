@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { buildAdminTicketsScreen, buildAutoRenewalOffConfirm, buildDeviceDeleteConfirm, buildDeviceScreen, buildRichPaymentScreen, buildRichScreen, buildSpinResultScreen, buildSupportCategoryScreen, buildSupportPromptScreen, buildSupportThreadScreen } from './rich-screens'
+import { buildAdminTemplatesScreen, buildAdminTicketsScreen, buildAutoRenewalOffConfirm, buildDeviceDeleteConfirm, buildDeviceScreen, buildRichPaymentScreen, buildRichScreen, buildSpinResultScreen, buildSupportCategoryScreen, buildSupportPromptScreen, buildSupportThreadScreen } from './rich-screens'
 import { channelCampaign, isChannelMember, isChannelReference } from './channel-referrals'
 import { miniAppDemo } from './model'
 import { isMiniAppOwnedUpdate, isPaymentUpdate, isUnsupportedPaymentUpdate, isUnsupportedCallback, telegramUpdateSchema, validWebhookSecret } from './bot'
@@ -167,7 +167,14 @@ describe('Telegram Mini App boundaries', () => {
     expect(thread).toContain('👤 Пользователь')
     expect(thread).toContain('@ivan')
     expect(thread).toContain('Пишите ответ прямо в чат')
+    expect(thread).toContain('avp:admq:ticket-1')
     expect(thread).toContain('avp:admc:ticket-1')
+    const templates = buildAdminTemplatesScreen({ screen: 'admin', overview: miniAppDemo, appUrl },
+      { id: 'ticket-1', subject: 'Проблема с подключением' },
+      [{ label: '🔄 Переподключение', text: 'Добавьте подписку заново.' }])
+    expect(templates).toContain('avp:admqs:ticket-1:0')
+    expect(templates).toContain('🔄 Переподключение')
+    expect(templates).toContain('avp:admt:ticket-1')
     expect(buildAdminTicketsScreen({ screen: 'admin', overview: miniAppDemo, appUrl }, [])).toContain('Открытых обращений нет')
   })
   it('shows service stats only to admins', () => {

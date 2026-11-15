@@ -11,6 +11,9 @@ export type AdminTelegramPayload = {
   text: string
   actionHref?: string
   actionLabel?: string
+  // Вторая кнопка — обычная ссылка (например, deep link в бота, не web_app).
+  actionHref2?: string
+  actionLabel2?: string
 }
 
 export async function processAdminTelegramDeliveries(input: {
@@ -44,6 +47,8 @@ export async function processAdminTelegramDeliveries(input: {
       text: true,
       actionHref: true,
       actionLabel: true,
+      actionHref2: true,
+      actionLabel2: true,
       attempts: true,
     },
   })
@@ -86,6 +91,8 @@ export async function processAdminTelegramDeliveries(input: {
         text: delivery.text,
         actionHref: delivery.actionHref,
         actionLabel: delivery.actionLabel,
+        actionHref2: delivery.actionHref2,
+        actionLabel2: delivery.actionLabel2,
       })
       await prisma.adminTelegramDelivery.update({
         where: { id: delivery.id },
@@ -228,10 +235,17 @@ async function sendAdminTelegramMessage(input: {
   text: string
   actionHref?: string | null
   actionLabel?: string | null
+  actionHref2?: string | null
+  actionLabel2?: string | null
 }) {
   const actionUrl = input.actionHref
     ? new URL(input.actionHref, `${getAppUrl()}/`).toString()
     : null
+  // Вторая кнопка — внешняя ссылка (t.me deep link), не web_app.
+  const actionUrl2 = input.actionHref2 && input.actionLabel2 ? input.actionHref2 : null
+  const buttons: Array<Record<string, unknown>> = []
+  if (actionUrl && input.actionLabel) buttons.push({ text: input.actionLabel, web_app: { url: actionUrl } })
+  if (actionUrl2 && input.actionLabel2) buttons.push({ text: input.actionLabel2, url: actionUrl2 })
   const response = await fetch(`https://api.telegram.org/bot${input.token}/sendMessage`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -240,15 +254,8 @@ async function sendAdminTelegramMessage(input: {
       text: input.text.slice(0, 4000),
       parse_mode: 'HTML',
       disable_web_page_preview: true,
-      ...(actionUrl && input.actionLabel
-        ? {
-            reply_markup: {
-              inline_keyboard: [[{
-                text: input.actionLabel,
-                web_app: { url: actionUrl },
-              }]],
-            },
-          }
+      ...(buttons.length > 0
+        ? { reply_markup: { inline_keyboard: buttons.map(button => [button]) } }
         : {}),
     }),
     signal: AbortSignal.timeout(DELIVERY_TIMEOUT_MS),

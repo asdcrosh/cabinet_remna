@@ -317,10 +317,26 @@ export function buildSupportThreadScreen(input: RichScreenInput, thread: { id: s
     }
   }
   if (thread.status !== 'Закрыто') {
-    parts.push('<p>✍️ Пишите ответ прямо в чат — следующее сообщение попадёт в обращение и появится здесь. Ваш текст после отправки убирается, переписка остаётся в этом окне. Можно приложить фото или файл.</p>',
-      row(cb('✅ Закрыть обращение', `${viewer === 'admin' ? 'admc' : 'supc'}:${thread.id}`)))
+    parts.push('<p>✍️ Пишите ответ прямо в чат — следующее сообщение попадёт в обращение и появится здесь. Ваш текст после отправки убирается, переписка остаётся в этом окне. Можно приложить фото или файл.</p>')
+    if (viewer === 'admin') parts.push(row(cb('⚡ Быстрые ответы', `admq:${thread.id}`)))
+    parts.push(row(cb('✅ Закрыть обращение', `${viewer === 'admin' ? 'admc' : 'supc'}:${thread.id}`)))
   }
   parts.push(row(cb('◀️ К обращениям', viewer === 'admin' ? 'admt' : 'support')))
+  return parts.join('')
+}
+
+// Шаблонные ответы администратора: нажатие сразу отправляет текст пользователю.
+export function buildAdminTemplatesScreen(input: RichScreenInput,
+  thread: { id: string; subject: string },
+  templates: Array<{ label: string; text: string }>) {
+  const parts = [brandHeader(input.bannerUrl), '<h3>⚡ Быстрые ответы</h3>',
+    `<h4>${escape(thread.subject)}</h4>`,
+    '<p>Нажмите на шаблон — он сразу уйдёт пользователю в этот чат и в кабинет.</p>']
+  templates.forEach((template, index) => {
+    parts.push(row(cb(template.label, `admqs:${thread.id}:${index}`)),
+      `<p>${escape(template.text.length > 120 ? `${template.text.slice(0, 120)}…` : template.text)}</p>`)
+  })
+  parts.push(row(cb('◀️ К обращению', `admt:${thread.id}`)))
   return parts.join('')
 }
 

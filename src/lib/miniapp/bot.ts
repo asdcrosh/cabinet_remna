@@ -4,7 +4,7 @@ import { miniAppUrl } from './config'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { getBotAdminThreadScreen, getBotAdminTicketsScreen, getBotBroadcastThemesScreen, getBotPaymentScreen, getBotScreen, getBotScreenInput, getBotSupportThreadScreen } from './bot-screens'
-import { botScreens, buildAutoRenewalOffConfirm, buildBroadcastPreviewScreen, buildBroadcastPromptScreen, buildBroadcastSentScreen, buildDeviceDeleteConfirm, buildDeviceScreen, buildSpinResultScreen, buildSupportCategoryScreen, buildSupportPromptScreen, buildWhatsNewScreen, type BotScreen } from './rich-screens'
+import { botScreens, buildAdminTemplatesScreen, buildAutoRenewalOffConfirm, buildBroadcastPreviewScreen, buildBroadcastPromptScreen, buildBroadcastSentScreen, buildDeviceDeleteConfirm, buildDeviceScreen, buildSpinResultScreen, buildSupportCategoryScreen, buildSupportPromptScreen, buildWhatsNewScreen, type BotScreen } from './rich-screens'
 import { broadcastThemeView, createBotBroadcast, findBroadcastTheme, parseBroadcastDraft, serializeBroadcastDraft, validateBroadcastText } from './broadcast-bot'
 import { claimChannelReward } from './channel-referrals'
 import { unbindUserDevice } from '@/lib/device-unbind'
@@ -18,6 +18,7 @@ import { answerStarsPreCheckout, isOurStarsPayload, refundStarsPayment, settleSt
 import { displayCallbackScreen } from './callback-screen'
 import { clearBotDialogState, getBotDialogStateByTelegram, setBotDialogState } from './bot-dialog'
 import { closeTicketAsAdmin, closeTicketFromBot, createTicketFromBot, isSupportCategory, replyToTicketAsAdmin, replyToTicketFromBot } from './support-bot'
+import { supportReplyTemplates } from './support-templates'
 import { supportCategories } from '@/lib/support'
 import { buildSupportAttachment, SUPPORT_ATTACHMENT_MAX_SIZE, SupportAttachmentError } from '@/lib/support-attachments'
 import { disableAutoRenewal } from '@/lib/auto-renewal'
@@ -87,7 +88,7 @@ export function isMiniAppOwnedUpdate(value: unknown) {
   if (typeof content !== 'string') return false
   if (['Моя подписка', 'Мои устройства', 'Пригласить друга', 'Поддержка'].includes(content)) return true
   return /^\/(?:app|menu|subscription|connect|plans|billing|devices|bonus|notifications|referrals|settings|admin|support|paysupport|help)(?:@[A-Za-z0-9_]+)?(?:\s|$)/.test(content)
-    || /^\/start(?:@[A-Za-z0-9_]+)?(?:\s+(?:ref_[A-Z0-9]{6,8}|update))?$/.test(content)
+    || /^\/start(?:@[A-Za-z0-9_]+)?(?:\s+(?:ref_[A-Z0-9]{6,8}|update|admt_[A-Za-z0-9]{1,40}))?$/.test(content)
 }
 
 // Произвольный текст принадлежит новому боту, если пользователя ждёт ввод
@@ -377,6 +378,52 @@ export async function handleMiniAppUpdate(update: z.infer<typeof telegramUpdateS
       await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
       return
     }
+    // Список шаблонных ответов для открытого обращения.
+    if (action.startsWith('admq:')) {
+      const ticketId = action.slice(5)
+      const account = await prisma.user.findUnique({ where: { telegramId: BigInt(callback.from.id) }, select: { id: true, role: true } })
+      const ticket = account && account.role !== 'USER'
+        ? await prisma.supportTicket.findUnique({ where: { id: ticketId }, select: { subject: true, status: true } })
+        : null
+      if (account && ticket && ticket.status !== 'CLOSED') {
+        const html = buildAdminTemplatesScreen(await getBotScreenInput(callback.from.id, 'admin'),
+          { id: ticketId, subject: ticket.subject }, supportReplyTemplates)
+        const used = await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
+        if (used) {
+          await prisma.supportTicket.updateMany({ where: { id: ticketId },
+            data: { adminBotChatId: BigInt(callback.from.id), adminBotMessageId: used } })
+        }
+        return
+      }
+      const html = await getBotAdminTicketsScreen(callback.from.id, ticket ? 'Обращение уже закрыто.' : 'Обращение не найдено')
+      await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
+      return
+    }
+    // Шаблон выбран: ответ уходит пользователю, окно возвращается к переписке.
+    if (action.startsWith('admqs:')) {
+      const rest = action.slice(6)
+      const sep = rest.lastIndexOf(':')
+      const ticketId = sep > 0 ? rest.slice(0, sep) : ''
+      const template = supportReplyTemplates[Number(rest.slice(sep + 1))]
+      const account = await prisma.user.findUnique({ where: { telegramId: BigInt(callback.from.id) }, select: { id: true, role: true } })
+      if (account && account.role !== 'USER' && ticketId && template) {
+        const result = await replyToTicketAsAdmin(account.id, ticketId, template.text)
+        const html = result.ok
+          ? await getBotAdminThreadScreen(callback.from.id, ticketId, '⚡ Шаблонный ответ отправлен пользователю.')
+          : await getBotAdminThreadScreen(callback.from.id, ticketId, result.error)
+        const used = await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
+        if (used) {
+          await prisma.supportTicket.updateMany({ where: { id: ticketId },
+            data: { adminBotChatId: BigInt(callback.from.id), adminBotMessageId: used } })
+        }
+        // Живой режим сохраняется: после шаблона можно писать дальше.
+        if (result.ok) await setBotDialogState(account.id, `admin:reply:${ticketId}`)
+        return
+      }
+      const html = await getBotAdminTicketsScreen(callback.from.id, 'Шаблон не найден. Откройте обращение заново.')
+      await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
+      return
+    }
     if (action === 'admt') {
       const html = await getBotAdminTicketsScreen(callback.from.id)
       const used = await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
@@ -506,6 +553,30 @@ export async function handleMiniAppUpdate(update: z.infer<typeof telegramUpdateS
   if (!section) return
   const startPayload = message.text?.match(/^\/start(?:@[a-zA-Z0-9_]+)?(?:\s+(.+))?$/)?.[1]?.trim()
   const referral = startPayload?.match(/^ref_([A-Z0-9]{6,8})$/)?.[1]
+  // Deep link из уведомления админу: сразу открываем тред обращения в боте.
+  const adminThreadTicketId = command === '/start' ? startPayload?.match(/^admt_([A-Za-z0-9]{1,40})$/)?.[1] : undefined
+  if (adminThreadTicketId && process.env.TELEGRAM_RICH_MESSAGES_ENABLED === 'true') {
+    const account = await prisma.user.findUnique({ where: { telegramId: BigInt(message.from.id) }, select: { id: true, role: true } })
+    if (account && account.role !== 'USER') {
+      const html = await getBotAdminThreadScreen(message.from.id, adminThreadTicketId)
+      const sent = await miniAppBotCall<{ message_id?: number }>('sendRichMessage', { chat_id: message.chat.id,
+        rich_message: { html }, protect_content: true, reply_markup: { remove_keyboard: true } }).catch(() => null)
+      const used = sent && typeof sent.message_id === 'number' ? sent.message_id : null
+      if (used) {
+        // Как при открытии из очереди: якорь окна и живой режим ответа.
+        await prisma.$transaction([
+          prisma.supportTicket.updateMany({ where: { id: adminThreadTicketId },
+            data: { adminBotChatId: BigInt(message.chat.id), adminBotMessageId: used } }),
+          prisma.supportTicket.updateMany({ where: { id: { not: adminThreadTicketId }, adminBotChatId: BigInt(message.chat.id), adminBotMessageId: used },
+            data: { adminBotMessageId: null } }),
+          prisma.user.updateMany({ where: { id: account.id, adminQueueBotMessageId: used }, data: { adminQueueBotMessageId: null } }),
+        ])
+        const ticket = await prisma.supportTicket.findUnique({ where: { id: adminThreadTicketId }, select: { status: true } })
+        if (ticket && ticket.status !== 'CLOSED') await setBotDialogState(account.id, `admin:reply:${adminThreadTicketId}`)
+      }
+      return
+    }
+  }
   const content = welcomeMessage(section, referral)
   if (process.env.TELEGRAM_RICH_MESSAGES_ENABLED === 'true') {
     // Переход по ссылке из анонса в канале встречаем экраном новых возможностей.

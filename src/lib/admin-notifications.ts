@@ -49,6 +49,8 @@ export async function createAdminNotification(input: {
                   text: input.telegram.text,
                   actionHref: input.telegram.actionHref,
                   actionLabel: input.telegram.actionLabel,
+                  actionHref2: input.telegram.actionHref2,
+                  actionLabel2: input.telegram.actionLabel2,
                 },
               },
             }
