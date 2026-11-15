@@ -417,6 +417,10 @@ if (value("TELEGRAM_CHANNEL_REWARDS_ENABLED") === "true") {
     const n = Number(value(name));
     if (!Number.isInteger(n) || n < min || n > max) errors.push(`${name} must be ${min}..${max}`);
   }
+  if (value("TELEGRAM_REWARD_REFERRER_PROMO_PERCENT")) {
+    const n = Number(value("TELEGRAM_REWARD_REFERRER_PROMO_PERCENT"));
+    if (!Number.isInteger(n) || n < 1 || n > 99) errors.push("TELEGRAM_REWARD_REFERRER_PROMO_PERCENT must be 1..99");
+  }
 }
 
 if (errors.length > 0) {

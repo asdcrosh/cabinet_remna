@@ -2052,6 +2052,8 @@ model TelegramChannelReferral {
   claimedAt DateTime?
   referrerPaymentId String? @unique
   referredPaymentId String? @unique
+  /// Персональный промокод, выданный пригласившему за этого друга
+  referrerPromoCodeId String? @unique
   @@index([referrerId, claimedAt])
 }
 

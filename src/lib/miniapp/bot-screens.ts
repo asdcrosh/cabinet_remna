@@ -57,7 +57,7 @@ export async function getBotScreenInput(telegramId: number, screen: BotScreen, n
         prisma.telegramChannelReferral.findUnique({ where: { referredUserId: user.id } }),
       ])
       if (campaign) input.referral = { url: `https://t.me/${process.env.TELEGRAM_MINIAPP_BOT_USERNAME || 'alekseevVP_bot'}?start=ref_${code}`,
-        condition: `Пригласите нового пользователя до его вступления в канал: вам ${campaign.referrerDays} дн., другу ${campaign.referredDays} дн. Лимит: ${campaign.cap} бонусов.`,
+        condition: `Пригласите нового пользователя до его вступления в канал: вам ${campaign.referrerDays} дн. и промокод −${campaign.referrerPromoPercent}%, другу ${campaign.referredDays} дн. Бонус начисляется после вступления друга в канал. Лимит: ${campaign.cap} бонусов.`,
         invited, claimed, channelUrl: campaign.channelUrl, eligible: Boolean(own?.eligible), ownClaimed: Boolean(own?.claimedAt) }
     }
     if (screen === 'billing') {
@@ -116,16 +116,22 @@ export async function getBotScreenInput(telegramId: number, screen: BotScreen, n
 }
 
 // Промокоды, выданные пользователю и ещё не использованные им.
+// Источники: колесо, приветственный бонус, объединение кодов и персональные
+// коды (реферальные награды и выдача из кабинета) — они привязаны по email.
 export async function getBotPromoCodes(userId: string) {
-  const [openings, welcomes, merges] = await Promise.all([
+  const account = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } })
+  const [openings, welcomes, merges, personal] = await Promise.all([
     prisma.bonusBoxOpening.findMany({ where: { userId, promoCodeId: { not: null } },
       select: { promoCode: { select: { code: true } } }, orderBy: { createdAt: 'desc' }, take: 20 }),
     prisma.welcomeBonusRedemption.findMany({ where: { userId, promoCodeId: { not: null } },
       select: { promoCode: { select: { code: true } } }, orderBy: { createdAt: 'desc' }, take: 20 }),
     prisma.promoCodeMerge.findMany({ where: { userId },
       select: { resultPromo: { select: { code: true } } }, orderBy: { createdAt: 'desc' }, take: 20 }),
+    account ? prisma.promoCode.findMany({ where: { audience: 'PERSONAL', allowedEmails: { has: account.email.toLowerCase() } },
+      select: { code: true }, orderBy: { createdAt: 'desc' }, take: 20 }) : Promise.resolve([]),
   ])
-  const codes = [...new Set([...merges.map(item => item.resultPromo.code), ...openings.map(item => item.promoCode?.code), ...welcomes.map(item => item.promoCode?.code)]
+  const codes = [...new Set([...merges.map(item => item.resultPromo.code), ...personal.map(item => item.code),
+    ...openings.map(item => item.promoCode?.code), ...welcomes.map(item => item.promoCode?.code)]
     .filter((code): code is string => Boolean(code)))]
   if (!codes.length) return []
   const [active, redeemed] = await Promise.all([
