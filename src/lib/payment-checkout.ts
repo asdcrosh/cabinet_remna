@@ -50,7 +50,7 @@ export async function createPaymentForUser(
   req: Request,
   userId: string,
   // mobileApp: платёж из приложения StealthNet — после оплаты вернуть пользователя в приложение.
-  options: { telegramBot?: boolean; returnUrl?: string; mobileApp?: boolean } = {}
+  options: { telegramBot?: boolean; returnUrl?: string; mobileApp?: boolean; paymentMethodType?: 'bank_card' | 'sbp' } = {}
 ) {
   let body: unknown
   try {
@@ -84,7 +84,6 @@ export async function createPaymentForUser(
   if (provider === 'TELEGRAM_STARS' && (purchaseType !== 'SUBSCRIPTION' || autoRenewalConsent || whitelistAddon)) {
     return jsonResponse({ error: 'Для Stars доступна покупка подписки без автопродления и дополнений' }, { status: 400 })
   }
-  // Mini App: карта/СБП через ЮKassa внутри Telegram — без автопродления и дополнений.
   const miniAppCardSubscription = options.telegramBot && provider === 'YOOKASSA'
     && purchaseType === 'SUBSCRIPTION' && !whitelistAddon && !autoRenewalConsent
   if (options.telegramBot && provider !== 'TELEGRAM_STARS' && !miniAppCardSubscription && (
@@ -403,6 +402,7 @@ export async function createPaymentForUser(
         planId: plan.id,
         purchaseType,
         provider,
+        yookassaPaymentMethodType: options.paymentMethodType ?? null,
         status: 'PENDING',
         createdAt: { gt: getFreshPendingPaymentCutoff() },
         deviceLimit: pricing.selectedDeviceLimit,
@@ -583,6 +583,7 @@ export async function createPaymentForUser(
       promoCode,
       provider,
       autoRenewalConsent,
+      paymentMethodType: options.paymentMethodType,
       whitelistAddon: includesBundledWhitelistAddon,
     })
   }
@@ -674,6 +675,7 @@ export async function createPaymentForUser(
                 : undefined,
             provider,
             providerStatus: 'pending',
+            yookassaPaymentMethodType: options.paymentMethodType,
             checkoutKey: idempotencyKey,
             autoRenewalConsentAcceptedAt: autoRenewalConsent ? new Date() : null,
             autoRenewalConsentVersion: autoRenewalConsent ? autoRenewalConsentVersion : null,
@@ -713,6 +715,7 @@ export async function createPaymentForUser(
         promoCode,
         provider,
         autoRenewalConsent,
+        paymentMethodType: options.paymentMethodType,
         whitelistAddon: includesBundledWhitelistAddon,
       })
     }
@@ -868,7 +871,7 @@ export async function createPaymentForUser(
     }
   }
 
-  const savePaymentMethod = isSubscriptionPurchase && (
+  const savePaymentMethod = isSubscriptionPurchase && options.paymentMethodType !== 'sbp' && (
     autoRenewalConsent || await shouldSavePaymentMethodBestEffort(user.id, plan.id)
   )
   let payment
@@ -878,6 +881,7 @@ export async function createPaymentForUser(
       description,
       returnUrl,
       savePaymentMethod,
+      ...(options.paymentMethodType ? { paymentMethodType: options.paymentMethodType } : {}),
       metadata: {
         userId: user.id,
         planId: plan.id,
@@ -958,6 +962,7 @@ function existingCheckoutResponse(
     promoCode?: string
     provider: 'YOOKASSA' | 'PAYANYWAY' | 'PLATEGA' | 'TELEGRAM_STARS'
     autoRenewalConsent: boolean
+    paymentMethodType?: 'bank_card' | 'sbp'
     whitelistAddon: boolean
   }
 ) {
@@ -968,6 +973,7 @@ function existingCheckoutResponse(
     || payment.purchaseType !== input.purchaseType
     || payment.deviceLimit !== input.deviceLimit
     || payment.provider !== input.provider
+    || (payment.yookassaPaymentMethodType ?? null) !== (input.paymentMethodType ?? null)
     || storedPromoCode !== requestedPromoCode
     || Boolean(payment.autoRenewalConsentAcceptedAt) !== input.autoRenewalConsent
     || Boolean(readBundledWhitelistAddonSnapshot(payment.addonSnapshot)) !== input.whitelistAddon

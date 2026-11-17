@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from 'react'
 import { ArrowUpRight, Bell, Check, Copy, CreditCard, Gift, Headphones, Home, LayoutGrid, LoaderCircle, Lock, RefreshCw, Settings as SettingsIcon, Shield, Smartphone, Sparkles, Trophy, Users, Wallet, Wifi, Wrench, X } from 'lucide-react'
+import { BrandLogo } from '@/components/brand-logo'
 import { DevicesList } from '@/components/dashboard/devices-list'
 import { KeysCard } from '@/components/dashboard/keys-card'
 import { SupportPanelDynamic } from '@/components/support/support-panel-dynamic'
@@ -9,7 +10,7 @@ import type { SupportTicket } from '@/components/support/support-panel-model'
 import type { BonusBoxMissionView, BonusBoxOverview, OpenBoxResponse } from '@/components/bonus-box/bonus-box-types'
 import { getTelegramLaunchData } from '@/lib/telegram-miniapp-client'
 import { miniAppDestination } from '@/lib/miniapp/destination'
-import { miniAppDemo, type MiniAppOverview } from '@/lib/miniapp/model'
+import { miniAppDemo, type MiniAppOverview, type TelegramRubleMethod } from '@/lib/miniapp/model'
 import { AUTO_RENEWAL_CONSENT_VERSION } from '@/lib/auto-renewal-consent'
 import styles from './mini-app.module.css'
 
@@ -41,7 +42,7 @@ async function request<T>(url: string, body?: unknown, method?: 'POST' | 'PATCH'
   return data as T
 }
 
-export function MiniApp({ demo = false }: { demo?: boolean }) {
+export function MiniApp({ demo = false, brandName = 'VPN Cabinet' }: { demo?: boolean; brandName?: string }) {
   const [data, setData] = useState<MiniAppOverview | null>(demo ? miniAppDemo : null)
   const [tab, setTab] = useState<Tab>('home')
   const [error, setError] = useState('')
@@ -55,6 +56,7 @@ export function MiniApp({ demo = false }: { demo?: boolean }) {
   const [selectedLimits, setSelectedLimits] = useState<Record<string, number>>({})
   const [promoCodes, setPromoCodes] = useState<Record<string, string>>({})
   const [checkoutPlanId, setCheckoutPlanId] = useState<string | null>(null)
+  const [botCheckoutGrant, setBotCheckoutGrant] = useState<string | null>(null)
   const [autoRenewal, setAutoRenewal] = useState<AutoRenewalState>(null)
   const [renewalConsent, setRenewalConsent] = useState(false)
   const [bonusData, setBonusData] = useState<BonusBoxOverview | null>(null)
@@ -94,24 +96,28 @@ export function MiniApp({ demo = false }: { demo?: boolean }) {
           for (const key of Array.from(clean.searchParams.keys())) if (key.startsWith('tgWebApp') || key === 'ref') clean.searchParams.delete(key)
           history.replaceState(null, '', `${clean.pathname}${clean.search}`)
         }
-        const result = await request<MiniAppOverview>('/api/miniapp/overview')
+        const params = new URLSearchParams(window.location.search)
+        const requestedPlan = params.get('plan')
+        const grant = params.get('botCheckout')
+        const checkoutQuery = requestedPlan && grant ? new URLSearchParams({ plan: requestedPlan, botCheckout: grant }) : null
+        const result = await request<MiniAppOverview>(checkoutQuery ? `/api/miniapp/overview?${checkoutQuery}` : '/api/miniapp/overview')
         if (!cancelled) {
           setData(result)
-          const params = new URLSearchParams(window.location.search)
+          if (result.botCheckout) setBotCheckoutGrant(grant)
           const initial = params.get('tab')
           if (knownTabs.includes(initial as Tab)) setTab(initial as Tab)
           else if (initial && initial !== 'home') window.location.replace(miniAppDestination(initial))
           // Возврат со страницы ЮKassa: оплата прошла внутри Telegram, подтверждаем здесь же.
-          if (params.get('paid') === '1') setNotice('Оплата получена. Подписка обновится автоматически — обычно это занимает меньше минуты.')
-          const requestedPlan = params.get('plan')
+          if (params.get('paid') === '1') setNotice('Проверяем оплату. Текущий статус можно посмотреть в разделе «Платежи».')
           const requestedPromo = params.get('promo')?.trim()
           if (requestedPlan && result.plans.some(item => item.id === requestedPlan && !item.isPromo)) {
-            setTab('plans'); setCheckoutPlanId(requestedPlan)
+            setTab('plans')
+            if (params.get('browserCheckout') !== '1' && (result.botCheckout || result.rublePaymentMethods?.length)) setCheckoutPlanId(requestedPlan)
             // Ссылка из бота с применённым промокодом: предзаполняем поле, чтобы скидка применилась автоматически.
             if (requestedPromo) setPromoCodes(previous => ({ ...previous, [requestedPlan]: requestedPromo }))
           }
           if (params.get('paid') || requestedPlan) {
-            for (const key of ['paid', 'payment', 'plan', 'promo']) params.delete(key)
+            for (const key of ['paid', 'payment', 'plan', 'promo', 'botCheckout', 'browserCheckout']) params.delete(key)
             const query = params.toString()
             history.replaceState(null, '', `${window.location.pathname}${query ? `?${query}` : ''}`)
           }
@@ -210,12 +216,24 @@ export function MiniApp({ demo = false }: { demo?: boolean }) {
     } catch (e) { setError(e instanceof Error ? e.message : 'Не удалось создать счёт') }
     finally { setBusy(false) }
   }
-  async function payByCard(plan: MiniAppOverview['plans'][number]) {
+  function openBrowserCheckout(plan: MiniAppOverview['plans'][number]) {
+    const url = new URL('/dashboard/plans', window.location.origin)
+    url.searchParams.set('plan', plan.id)
+    if (plan.current) url.searchParams.set('intent', 'renew')
+    const promo = promoCodes[plan.id]?.trim()
+    if (promo) url.searchParams.set('promo', promo)
+    const webApp = window.Telegram?.WebApp
+    if (webApp?.openLink) webApp.openLink(url.toString())
+    else if (!webApp?.initData) window.open(url.toString(), '_blank', 'noopener,noreferrer')
+    else setError('Откройте сайт кабинета в обычном браузере.')
+  }
+  async function payInTelegram(plan: MiniAppOverview['plans'][number], method: TelegramRubleMethod) {
     if (demo) { setNotice('Это демонстрация. Счёт не создаётся.'); return }
     setBusy(true); setError(''); setNotice('')
     try {
       const result = await request<{ confirmationUrl?: string; redirectUrl?: string }>('/api/miniapp/checkout', {
-        planId: plan.id, purchaseType: 'SUBSCRIPTION', provider: 'YOOKASSA',
+        planId: plan.id, purchaseType: 'SUBSCRIPTION', provider: 'YOOKASSA', paymentMethodType: method,
+        ...(botCheckoutGrant && data?.botCheckout?.planId === plan.id ? { botCheckoutGrant } : {}),
         deviceLimit: selectedLimits[plan.id] ?? plan.initialDevices, idempotencyKey: crypto.randomUUID(),
         ...(promoCodes[plan.id]?.trim() ? { promoCode: promoCodes[plan.id]!.trim() } : {}),
       })
@@ -296,6 +314,8 @@ export function MiniApp({ demo = false }: { demo?: boolean }) {
   }
   const sub = data?.subscription
   const checkoutPlan = data?.plans.find(item => item.id === checkoutPlanId && !item.isPromo) ?? null
+  const methodsForPlan = (planId: string) =>
+    data?.botCheckout?.planId === planId ? data.botCheckout.methods : data?.rublePaymentMethods ?? []
   const checkoutLimit = checkoutPlan ? selectedLimits[checkoutPlan.id] ?? checkoutPlan.initialDevices : 0
   const checkoutExtraKopecks = checkoutPlan ? Math.max(0, checkoutLimit - checkoutPlan.devices) * checkoutPlan.extraDevicePriceKopecks : 0
   const checkoutTotalKopecks = checkoutPlan ? checkoutPlan.priceKopecks + checkoutExtraKopecks : 0
@@ -314,7 +334,7 @@ export function MiniApp({ demo = false }: { demo?: boolean }) {
   ]
   return <main className={styles.app}>
     <div className={styles.wrap}>
-      <header className={styles.header}><div className={styles.brand}><span className={styles.logo}>VP</span><span>Alekseev<span className={styles.brandAccent}>VP</span><small>Личный кабинет</small></span></div>
+      <header className={styles.header}><div className={styles.brand}><BrandLogo className={styles.logo} /><span>{brandName}<small>Личный кабинет</small></span></div>
         <button aria-label="Обновить данные" className={styles.iconButton} onClick={() => void refresh()} disabled={busy}><RefreshCw size={19} /></button></header>
       {demo && <div className={styles.demo}>Предпросмотр · вымышленные данные</div>}
       {error && <div role="alert" className={styles.alert}>{error} {!data && <button onClick={() => window.location.reload()}>Повторить</button>}</div>}
@@ -326,7 +346,7 @@ export function MiniApp({ demo = false }: { demo?: boolean }) {
           <div className={styles.banner} aria-hidden="true" />
           <div className={styles.intro}><span>Кабинет / {data.name}</span><h1>Ваш доступ<br /><em>в одном месте.</em></h1></div>
           <section className={styles.pass} aria-label="Моя подписка"><div className={styles.passTop}><span className={styles.pill}><span className={sub?.usable ? styles.dot : styles.offDot} />{sub?.title || 'Доступ ещё не подключён'}</span><Shield size={28} /></div>
-            <div className={styles.passBody}><small>ВАШ ДОСТУП</small><h2>{sub?.planName || 'AlekseevVP'}</h2><p>{sub ? `До ${date}` : 'Начните с выбора подписки'}</p></div>
+            <div className={styles.passBody}><small>ВАШ ДОСТУП</small><h2>{sub?.planName || brandName}</h2><p>{sub ? `До ${date}` : 'Начните с выбора подписки'}</p></div>
             <div className={styles.passBottom}><div><strong>{sub?.daysLeft == null ? (sub ? '∞' : '0') : Math.max(0, sub.daysLeft)}</strong><span>дней доступа</span></div><div><strong>{data.deviceCount}<i> / {sub?.deviceLimit ?? '∞'}</i></strong><span>устройств в кабинете</span></div></div>
           </section>
           <button className={styles.primary} onClick={() => navigate(sub?.usable ? 'connect' : 'plans')}><Wifi size={20} />{sub?.usable ? 'Подключить VPN' : 'Посмотреть тарифы'}<ArrowUpRight size={20} /></button>
@@ -340,13 +360,16 @@ export function MiniApp({ demo = false }: { demo?: boolean }) {
         </section>}
         {tab === 'plans' && <section><Heading eyebrow="ВАШ ДОСТУП" title="Тарифы и подписка" description="Тарифы и условия обновляются из личного кабинета." />
           {data.plans.length === 0 && <div className={styles.empty}>Для вашего аккаунта сейчас нет доступных тарифов.</div>}
-          {data.plans.map(plan => <article className={styles.plan} key={plan.id}><div><small>{plan.current ? 'ВАШ ТАРИФ' : 'ALEKSEEVVP'}</small>
+          {data.plans.map(plan => <article className={styles.plan} key={plan.id}><div><small>{plan.current ? 'ВАШ ТАРИФ' : brandName}</small>
               <h2>{plan.name}</h2><p>{plan.unlimited ? 'Без ограничения срока' : `${plan.days} дней`} · {plan.unlimitedDevices ? 'безлимит устройств' : plan.deviceAddonEnabled ? `${plan.devices}–${plan.maxDevices} устройств` : `${plan.initialDevices} устройств`}{plan.trafficLimitGb == null ? ' · безлимит трафика' : ` · ${plan.trafficLimitGb} ГБ`}</p>
               {plan.description && <p>{plan.description}</p>}
               {plan.isPlanSwitch && <p className={styles.planNote}>При смене тарифа начнётся новый срок. Оставшиеся дни текущего тарифа не переносятся.</p>}
             </div>
             {!plan.isPromo && <div className={styles.rublePrice}><span>Стоимость в кабинете</span><strong>{rub.format(plan.priceKopecks / 100)}</strong></div>}
-            {!plan.isPromo && <button className={styles.sitePay} onClick={() => setCheckoutPlanId(plan.id)}><CreditCard size={18} />Оплатить картой или СБП<ArrowUpRight size={18} /></button>}
+            {!plan.isPromo && <>
+              <button className={styles.sitePay} onClick={() => openBrowserCheckout(plan)}>Открыть кабинет в браузере<ArrowUpRight size={18} /></button>
+              {methodsForPlan(plan.id).length > 0 && <button className={styles.sitePay} onClick={() => setCheckoutPlanId(plan.id)}><CreditCard size={18} />Оплата в Telegram<ArrowUpRight size={18} /></button>}
+            </>}
             {data.starsEnabled && data.starsRateKopecks && <div className={styles.planBuy}>
               {plan.deviceAddonEnabled && !plan.unlimitedDevices && <label>Количество устройств
                 <select value={selectedLimits[plan.id] ?? plan.initialDevices} onChange={e => setSelectedLimits(previous => ({ ...previous, [plan.id]: Number(e.target.value) }))}>
@@ -359,7 +382,6 @@ export function MiniApp({ demo = false }: { demo?: boolean }) {
               <button className={styles.primary} disabled={busy} onClick={() => void buyPlan(plan)}>{plan.isPromo ? 'Получить доступ' : 'Оплатить Stars'}<ArrowUpRight size={18} /></button>
             </div>}
             </article>)}
-          <p className={styles.footnote}>Оплата картой и по СБП проходит внутри Telegram на защищённой странице ЮKassa. История платежей — в разделе «Платежи».</p>
         </section>}
         {tab === 'billing' && <section><Heading eyebrow="ОПЛАТЫ" title="Платежи" description="История оплат и автопродление — как в кабинете на сайте." />
           <article className={styles.plan}><div><small>АВТОПРОДЛЕНИЕ</small>
@@ -451,7 +473,7 @@ export function MiniApp({ demo = false }: { demo?: boolean }) {
           {demo ? <div className={styles.card}><div className={styles.device}><Smartphone /><span><b>iPhone</b><small>iOS · Rabbit Hole</small></span><Check /></div><div className={styles.device}><Smartphone /><span><b>MacBook</b><small>macOS · Rabbit Hole</small></span><Check /></div></div> : <DevicesList deviceLimit={sub?.deviceLimit} />}
           <button id="add-device-guide" className={styles.primary} onClick={() => navigate('connect')}>Подключить устройство<ArrowUpRight size={20} /></button></section>}
         {tab === 'connect' && <section><Heading eyebrow="БЫСТРЫЙ СТАРТ" title="Подключить VPN" description="Установите приложение, добавьте подписку и включите подключение." />
-          {demo ? <div className={styles.card}><p>1. Установите VPN-клиент</p><p>2. Добавьте подписку AlekseevVP</p><p>3. Включите VPN в приложении</p><small>Персональная ссылка появится после входа.</small></div>
+          {demo ? <div className={styles.card}><p>1. Установите VPN-клиент</p><p>2. Добавьте подписку {brandName}</p><p>3. Включите VPN в приложении</p><small>Персональная ссылка появится после входа.</small></div>
             : subscriptionUrl ? <KeysCard subscriptionUrl={subscriptionUrl} supportEnabled={data.support} deviceLimit={sub?.deviceLimit} /> : !busy && <div className={styles.empty}>Ссылка пока недоступна. Проверьте состояние подписки.</div>}</section>}
         {tab === 'referrals' && <section><Heading eyebrow="ПРИГЛАШАЙТЕ ДРУЗЕЙ" title="Больше дней вместе" description={referrals?.condition || 'Новый пользователь приходит по вашей ссылке и вступает в канал. Условия бонуса задаёт сервис.'} />
           <div className={styles.refHero}><Gift size={48} /><h2>Ваша рекомендация.<br />Наше спасибо.</h2><p>Бонусы поступают на ту же подписку, которой вы уже пользуетесь.</p></div>
@@ -466,10 +488,10 @@ export function MiniApp({ demo = false }: { demo?: boolean }) {
         {tab === 'support' && <section><Heading eyebrow="МЫ НА СВЯЗИ" title="Поможем разобраться" description="Опишите, что произошло. История обращений общая с кабинетом." />
           {demo ? <DemoSupport /> : tickets && <SupportPanelDynamic mode="user" initialTickets={tickets} />}</section>}
         {busy && <div role="status" className={styles.loading}><LoaderCircle className="animate-spin" size={18} />Загрузка…</div>}
-        {checkoutPlan && <div className={styles.sheetBackdrop} onClick={() => setCheckoutPlanId(null)}>
+        {checkoutPlan && methodsForPlan(checkoutPlan.id).length > 0 && <div className={styles.sheetBackdrop} onClick={() => setCheckoutPlanId(null)}>
           <section className={styles.sheet} role="dialog" aria-modal="true" aria-label="Оплата подписки" onClick={event => event.stopPropagation()}>
             <button className={styles.sheetClose} aria-label="Закрыть оплату" onClick={() => setCheckoutPlanId(null)}><X size={18} /></button>
-            <small className={styles.sheetEyebrow}>AlekseevVP · Заказ</small>
+            <small className={styles.sheetEyebrow}>{brandName} · Заказ</small>
             <h2>{checkoutPlan.name}</h2>
             <p className={styles.sheetSub}>{checkoutPlan.unlimited ? 'Без ограничения срока' : `${checkoutPlan.days} дней`} · {checkoutPlan.unlimitedDevices ? 'безлимит устройств' : `${checkoutLimit} устройств`}{checkoutPlan.trafficLimitGb == null ? ' · безлимит трафика' : ` · ${checkoutPlan.trafficLimitGb} ГБ`}</p>
             {checkoutPlan.deviceAddonEnabled && !checkoutPlan.unlimitedDevices && <label className={styles.sheetField}>Количество устройств
@@ -484,8 +506,12 @@ export function MiniApp({ demo = false }: { demo?: boolean }) {
               {checkoutExtraKopecks > 0 && <div className={styles.sheetLine}><span>Дополнительные устройства · {checkoutLimit - checkoutPlan.devices}</span><b>+{rub.format(checkoutExtraKopecks / 100)}</b></div>}
             </div>
             <div className={styles.sheetTotal}><span>Итого{promoCodes[checkoutPlan.id]?.trim() ? ' до скидки' : ''}</span><strong>{rub.format(checkoutTotalKopecks / 100)}</strong></div>
-            <button className={styles.primary} disabled={busy} onClick={() => void payByCard(checkoutPlan)}><Lock size={18} />Перейти к оплате<ArrowUpRight size={18} /></button>
-            <p className={styles.sheetSecure}>Откроется защищённая страница ЮKassa прямо здесь, в Telegram — картой или по СБП. Промокод и скидки применятся автоматически перед оплатой.</p>
+            {methodsForPlan(checkoutPlan.id).map(method => (
+              <button key={method} className={styles.primary} disabled={busy} onClick={() => void payInTelegram(checkoutPlan, method)}>
+                <Lock size={18} />{method === 'bank_card' ? 'Оплатить картой' : 'Оплатить по СБП'}<ArrowUpRight size={18} />
+              </button>
+            ))}
+            <p className={styles.sheetSecure}>ЮKassa покажет итоговую сумму с учётом скидок.</p>
           </section>
         </div>}
         <nav className={styles.nav} aria-label="Разделы приложения">{tabs.map(item => <button key={item.id} aria-current={tab === item.id ? 'page' : undefined} onClick={() => navigate(item.id)}><item.icon size={21} /><span>{item.label}</span></button>)}</nav>

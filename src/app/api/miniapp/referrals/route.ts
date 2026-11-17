@@ -12,7 +12,7 @@ export const GET = withAuth(async () => {
   if (!await isFeatureEnabled('referrals')) return jsonResponse({ error: 'Недоступно' }, { status: 404 })
   const campaign = channelCampaign()
   const code = await ensureUserReferralCode(session.uid)
-  const bot = process.env.TELEGRAM_MINIAPP_BOT_USERNAME || 'alekseevVP_bot'
+  const bot = process.env.TELEGRAM_MINIAPP_BOT_USERNAME || process.env.TELEGRAM_BOT_USERNAME || ''
   if (!/^[a-zA-Z0-9_]{5,32}$/.test(bot)) throw new Error('Invalid bot username')
   const [invited, claimed, own] = await Promise.all([
     prisma.telegramChannelReferral.count({ where: { referrerId: session.uid } }),

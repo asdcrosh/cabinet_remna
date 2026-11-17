@@ -1,3 +1,4 @@
+import { getBrandName } from '@/lib/branding'
 import { createHash, timingSafeEqual } from 'node:crypto'
 import { downloadTelegramFile, miniAppBotCall } from './bot-api'
 import { miniAppUrl } from './config'
@@ -127,13 +128,13 @@ export function welcomeMessage(section = 'home', referral?: string) {
   if (referral && /^[A-Z0-9]{6,8}$/.test(referral)) url.searchParams.set('ref', referral)
   return {
     text: section === 'support'
-      ? 'Поддержка AlekseevVP. Откройте приложение и создайте обращение. По вопросам оплаты укажите номер заказа.'
-      : 'AlekseevVP\nВаш интернет. Ваши правила.\n\nПодписка, устройства и помощь в одном приложении.',
-    reply_markup: { inline_keyboard: [[{ text: 'Открыть AlekseevVP', web_app: { url: url.toString() }, style: 'primary' }]] },
+      ? `Поддержка ${getBrandName()}. Откройте приложение и создайте обращение. По вопросам оплаты укажите номер заказа.`
+      : `${getBrandName()}\nПодписка, устройства и поддержка.`,
+    reply_markup: { inline_keyboard: [[{ text: 'Открыть кабинет', web_app: { url: url.toString() }, style: 'primary' }]] },
   }
 }
 
-export const welcomeWidgetHtml = '<html><body><div style="padding:20px;background:#101b25;color:#eef6ef;border-radius:20px"><div style="font-size:12px;color:#b5d4bc">ALEKSEEVVP</div><h2>Ваш интернет.<br>Ваши правила.</h2><p>Подписка, устройства и помощь<br>в одном приложении.</p></div></body></html>'
+const welcomeWidgetHtml = '<html><body><div style="padding:20px;background:#101b25;color:#eef6ef;border-radius:20px"><div style="font-size:12px;color:#b5d4bc">ЛИЧНЫЙ КАБИНЕТ</div><h2>Ваш интернет.<br>Ваши правила.</h2><p>Подписка, устройства и помощь<br>в одном приложении.</p></div></body></html>'
 
 export async function handleMiniAppUpdate(update: z.infer<typeof telegramUpdateSchema>) {
   if (update.pre_checkout_query) { await answerStarsPreCheckout(update.pre_checkout_query); return }
@@ -1005,7 +1006,7 @@ async function sendStarsInvoiceFromBot(telegramId: number, callbackId: string, p
   }
   if (!starsEnabled()) return fail('Оплата Stars временно недоступна.')
   const account = await prisma.user.findUnique({ where: { telegramId: BigInt(telegramId) }, select: { id: true } })
-  if (!account) return fail('Войдите через Telegram в приложение AlekseevVP, затем выберите тариф.', 'home')
+  if (!account) return fail('Войдите в кабинет через Telegram, затем выберите тариф.', 'home')
   const catalog = await buildPlanCatalog({ userId: account.id })
   const plan = catalog.plans.find(item => item.id === planId)
   if (!plan) return fail('Тариф больше недоступен. Откройте актуальный список.')
@@ -1032,7 +1033,7 @@ async function sendStarsInvoiceFromBot(telegramId: number, callbackId: string, p
       planName: plan.name, durationLabel, starsAmount: result.starsAmount, promoCode: promoCode ?? null }))
   }
   const invoice = await miniAppBotCall<{ message_id?: number }>('sendInvoice', { chat_id: telegramId, title: plan.name.slice(0, 32),
-    description: plan.unlimitedDuration ? 'Бессрочная подписка AlekseevVP' : `Подписка AlekseevVP на ${plan.durationDays} дней`,
+    description: plan.unlimitedDuration ? `Бессрочная подписка ${getBrandName()}` : `Подписка ${getBrandName()} на ${plan.durationDays} дней`,
     payload: `avp:${result.localPaymentId}`, provider_token: '', currency: 'XTR',
     prices: [{ label: plan.name.slice(0, 32), amount: result.starsAmount }], protect_content: true })
   // Запоминаем сообщение-счёт: после оплаты удалим его, чат останется чистым.

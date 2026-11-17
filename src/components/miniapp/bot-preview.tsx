@@ -22,7 +22,7 @@ export function BotPreview() {
     prefs: { telegram: true, email: true, broadcasts: false },
     referral: { url: 'https://t.me/alekseevVP_bot?start=ref_DEMO01', condition: 'Новый пользователь приходит по приглашению и вступает в канал. Канал и количество бонусных дней ещё не настроены.', invited: 3, claimed: 1, channelUrl: null, eligible: false, ownClaimed: false }, notice,
   }
-  const html = view === 'payment' ? buildRichPaymentScreen(input, miniAppDemo.plans[0]?.id ?? 'demo', true)
+  const html = view === 'payment' ? buildRichPaymentScreen(input, miniAppDemo.plans[0]?.id ?? 'demo', null)
     : view === 'device' ? buildDeviceScreen(input, demoDevice)
     : view === 'confirm' ? buildDeviceDeleteConfirm(input, demoDevice)
     : buildRichScreen(input)

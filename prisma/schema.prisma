@@ -815,6 +815,7 @@ model Payment {
   // Legacy-поля ЮKassa. Сохраняются для совместимости со старыми платежами.
   yookassaId      String?                @unique
   yookassaStatus  YookassaPaymentStatus?
+  yookassaPaymentMethodType String?
   confirmationUrl String? // URL для редиректа пользователя
 
   // Явное согласие пользователя, принятое в окне оформления заказа.
