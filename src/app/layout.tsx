@@ -9,6 +9,7 @@ import { TelegramMiniAppViewport } from '@/components/telegram/telegram-miniapp-
 import { TelegramMiniAppScript } from '@/components/telegram/telegram-miniapp-script'
 import { BrandingProvider } from '@/components/branding-provider'
 import { SessionExpiredBanner } from '@/components/auth/session-expired-banner'
+import { TELEGRAM_COLOR_SCHEME_KEY } from '@/lib/telegram-miniapp-viewport'
 
 export const dynamic = 'force-dynamic'
 
@@ -26,7 +27,11 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export const viewport: Viewport = {
-  themeColor: '#090718',
+  // Совпадает с --app-bg светлой и тёмной темы в design-system.css.
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#f7f6fb' },
+    { media: '(prefers-color-scheme: dark)', color: '#0c0a14' },
+  ],
   width: 'device-width',
   initialScale: 1,
 }
@@ -39,8 +44,16 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <Script id="theme-init" strategy="beforeInteractive">
           {`(() => {
             try {
+              const root = document.documentElement
               const media = window.matchMedia('(prefers-color-scheme: dark)')
-              const apply = () => document.documentElement.classList.toggle('dark', media.matches)
+              const telegramScheme = () => {
+                try { return window.sessionStorage.getItem('${TELEGRAM_COLOR_SCHEME_KEY}') } catch { return null }
+              }
+              const apply = () => {
+                if (root.dataset.themeSource === 'telegram') return
+                const scheme = telegramScheme()
+                root.classList.toggle('dark', scheme === 'dark' || (scheme !== 'light' && media.matches))
+              }
               apply()
               media.addEventListener?.('change', apply)
             } catch {}

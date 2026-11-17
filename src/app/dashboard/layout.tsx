@@ -13,6 +13,7 @@ import { AdminErrorCenter } from '@/components/admin/admin-error-center'
 import { AdminSidebarSearch } from '@/components/admin/admin-sidebar-search'
 import { MobileTabBarV2, MobileTopBarV2, SidebarNavV2 } from '@/components/dashboard/dashboard-nav-v2'
 import { countAvailableBonusBoxAttempts } from '@/lib/bonus-box-attempts'
+import { TelegramBackButton } from '@/components/telegram/telegram-back-button'
 
 export const dynamic = 'force-dynamic'
 
@@ -75,14 +76,16 @@ export default async function DashboardLayout({ children }: { children: React.Re
     return (
       <NavBadgesProvider initialBadges={navBadges} supportEnabled={features.support} showAdmin={isStaff}>
         {isStaff ? <AdminErrorCenter /> : null}
-        <div className="dashboard-shell min-h-screen pt-[var(--telegram-miniapp-safe-top)] xl:pt-0" data-design="v2">
+        <div className="dashboard-shell min-h-screen pt-[var(--app-safe-top)]" data-design="v2">
           <a
             href="#dashboard-content"
             className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[200] focus:rounded-lg focus:bg-slate-950 focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-white"
           >
             Перейти к содержимому
           </a>
-          <aside className="dashboard-sidebar fixed inset-y-0 left-0 z-40 hidden h-dvh w-64 flex-col overflow-hidden border-r xl:flex">
+          <div aria-hidden="true" className="telegram-safe-top-cap" />
+          <TelegramBackButton />
+          <aside className="dashboard-sidebar fixed inset-y-0 left-0 z-40 hidden h-dvh w-64 flex-col overflow-hidden border-r pt-[var(--app-safe-top)] xl:flex">
             <div className="shrink-0 px-5 pb-5 pt-5">
               <Brand brandName={brandName} />
             </div>
@@ -104,7 +107,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           </aside>
           <main className="dashboard-main min-w-0 w-full overflow-x-clip xl:ml-64 xl:w-auto">
             <MobileTopBarV2 brandName={brandName} showBonus={features.bonusBox} bonusAttempts={bonusAttempts} bell={bell} />
-            <div className="dashboard-content-frame mx-auto w-full max-w-[92rem] min-w-0 px-4 pb-28 pt-5 sm:px-7 sm:pt-7 xl:px-9 xl:pb-14 xl:pt-2">
+            <div className="dashboard-content-frame mx-auto w-full max-w-[92rem] min-w-0 px-4 pb-[calc(var(--app-mobile-nav-space)+1.5rem)] pt-5 sm:px-7 sm:pt-7 xl:px-9 xl:pb-14 xl:pt-2">
               <div id="dashboard-content" className="page-transition min-w-0 scroll-mt-20">{children}</div>
             </div>
           </main>
@@ -116,14 +119,16 @@ export default async function DashboardLayout({ children }: { children: React.Re
   return (
     <NavBadgesProvider initialBadges={navBadges} supportEnabled={features.support} showAdmin={isStaff}>
       {isStaff ? <AdminErrorCenter /> : null}
-      <div className="dashboard-shell min-h-screen pt-[var(--telegram-miniapp-safe-top)] xl:pt-0">
+      <div className="dashboard-shell min-h-screen pt-[var(--app-safe-top)]">
         <a
           href="#dashboard-content"
           className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[200] focus:rounded-lg focus:bg-slate-950 focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-white"
         >
           Перейти к содержимому
         </a>
-        <aside className="dashboard-sidebar fixed inset-y-0 left-0 z-40 hidden h-dvh w-64 flex-col overflow-hidden border-r xl:flex">
+        <div aria-hidden="true" className="telegram-safe-top-cap" />
+        <TelegramBackButton />
+        <aside className="dashboard-sidebar fixed inset-y-0 left-0 z-40 hidden h-dvh w-64 flex-col overflow-hidden border-r pt-[var(--app-safe-top)] xl:flex">
           <div className="shrink-0 px-5 pb-5 pt-5">
             <Brand brandName={brandName} />
           </div>
@@ -139,7 +144,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           </div>
         </aside>
         <main className="dashboard-main min-w-0 w-full overflow-x-clip xl:ml-64 xl:w-auto">
-          <div className="dashboard-content-frame mx-auto grid w-full max-w-[92rem] min-w-0 grid-cols-[minmax(0,1fr)] px-4 pb-28 pt-5 sm:grid-cols-[minmax(0,1fr)_2.75rem] sm:gap-x-4 sm:px-7 sm:pt-8 xl:px-9 xl:pb-14 xl:pt-9">
+          <div className="dashboard-content-frame mx-auto grid w-full max-w-[92rem] min-w-0 grid-cols-[minmax(0,1fr)] px-4 pb-[calc(var(--app-mobile-nav-space)+1.5rem)] pt-5 sm:grid-cols-[minmax(0,1fr)_2.75rem] sm:gap-x-4 sm:px-7 sm:pt-8 xl:px-9 xl:pb-14 xl:pt-9">
             <div id="dashboard-content" className="page-transition col-start-1 row-start-1 min-w-0 scroll-mt-20">{children}</div>
             <div className="dashboard-topbar relative z-50 hidden self-start sm:col-start-2 sm:row-start-1 sm:flex">
               <NotificationBell

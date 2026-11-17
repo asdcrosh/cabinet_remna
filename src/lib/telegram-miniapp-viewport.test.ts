@@ -1,9 +1,111 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
+  applyTelegramColorScheme,
+  cssColorToHex,
   markTelegramMiniApp,
   prepareTelegramMiniApp,
+  syncTelegramMiniAppColors,
   syncTelegramMiniAppInsets,
 } from './telegram-miniapp-viewport'
+
+function themeRoot() {
+  const classes = new Set<string>()
+  return {
+    classes,
+    dataset: {} as { themeSource?: string },
+    classList: {
+      toggle: (token: string, force?: boolean) => {
+        if (force) classes.add(token)
+        else classes.delete(token)
+      },
+    },
+  }
+}
+
+describe('applyTelegramColorScheme', () => {
+  it('follows the Telegram theme instead of the phone theme', () => {
+    const root = themeRoot()
+
+    expect(applyTelegramColorScheme(root, 'dark')).toBe('dark')
+    expect(root.classes.has('dark')).toBe(true)
+    expect(root.dataset.themeSource).toBe('telegram')
+
+    expect(applyTelegramColorScheme(root, 'light')).toBe('light')
+    expect(root.classes.has('dark')).toBe(false)
+  })
+
+  it('leaves the page theme alone when Telegram does not report a scheme', () => {
+    const root = themeRoot()
+    root.classes.add('dark')
+
+    expect(applyTelegramColorScheme(root, undefined)).toBeNull()
+    expect(root.classes.has('dark')).toBe(true)
+    expect(root.dataset.themeSource).toBeUndefined()
+  })
+})
+
+describe('cssColorToHex', () => {
+  it('converts computed colors to the #rrggbb format Telegram accepts', () => {
+    expect(cssColorToHex('rgb(12, 10, 20)')).toBe('#0c0a14')
+    expect(cssColorToHex('rgba(247, 246, 251, 1)')).toBe('#f7f6fb')
+    expect(cssColorToHex('rgb(12 10 20)')).toBe('#0c0a14')
+    expect(cssColorToHex('#FFF')).toBe('#ffffff')
+    expect(cssColorToHex('#0c0a14')).toBe('#0c0a14')
+  })
+
+  it('rejects transparent and unknown colors', () => {
+    expect(cssColorToHex('rgba(0, 0, 0, 0)')).toBeNull()
+    expect(cssColorToHex('rgb(12 10 20 / 50%)')).toBeNull()
+    expect(cssColorToHex('transparent')).toBeNull()
+    expect(cssColorToHex('rgb(300, 0, 0)')).toBeNull()
+    expect(cssColorToHex('')).toBeNull()
+  })
+})
+
+describe('syncTelegramMiniAppColors', () => {
+  it('paints the Telegram header, background and bottom bar with the cabinet background', () => {
+    const setHeaderColor = vi.fn()
+    const setBackgroundColor = vi.fn()
+    const setBottomBarColor = vi.fn()
+
+    syncTelegramMiniAppColors(
+      { isVersionAtLeast: () => true, setHeaderColor, setBackgroundColor, setBottomBarColor },
+      '#0c0a14',
+    )
+
+    expect(setHeaderColor).toHaveBeenCalledWith('#0c0a14')
+    expect(setBackgroundColor).toHaveBeenCalledWith('#0c0a14')
+    expect(setBottomBarColor).toHaveBeenCalledWith('#0c0a14')
+  })
+
+  it('skips methods the client version does not support and survives client errors', () => {
+    const setHeaderColor = vi.fn(() => {
+      throw new Error('WebAppHeaderColorInvalid')
+    })
+    const setBackgroundColor = vi.fn()
+    const setBottomBarColor = vi.fn()
+
+    expect(() =>
+      syncTelegramMiniAppColors(
+        {
+          isVersionAtLeast: (version) => version !== '7.10',
+          setHeaderColor,
+          setBackgroundColor,
+          setBottomBarColor,
+        },
+        '#f7f6fb',
+      ),
+    ).not.toThrow()
+    expect(setBackgroundColor).toHaveBeenCalledWith('#f7f6fb')
+    expect(setBottomBarColor).not.toHaveBeenCalled()
+  })
+
+  it('does nothing without a color', () => {
+    const setHeaderColor = vi.fn()
+    syncTelegramMiniAppColors({ isVersionAtLeast: () => true, setHeaderColor }, null)
+    expect(setHeaderColor).not.toHaveBeenCalled()
+  })
+})
 
 describe('markTelegramMiniApp', () => {
   it('marks the document so Telegram-only spacing can be applied', () => {
@@ -34,7 +136,6 @@ describe('prepareTelegramMiniApp', () => {
       'ready',
       'expand',
       'disableVerticalSwipes',
-      'setHeaderColor:#0a0c0d',
       'requestFullscreen',
     ])
   })

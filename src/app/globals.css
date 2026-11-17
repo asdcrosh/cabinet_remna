@@ -9,18 +9,34 @@
     --muted: 103 113 113;
     --cabinet-line: 210 214 209;
     --cabinet-accent: 8 145 178;
-    --telegram-miniapp-top-offset: 0px;
-    --telegram-miniapp-bottom-offset: 0px;
-    --telegram-miniapp-safe-top: max(
-      env(safe-area-inset-top),
-      calc(var(--tg-content-safe-area-inset-top, 0px) + var(--telegram-miniapp-top-offset, 0px))
+    /* Безопасные зоны экрана. В браузере их задаёт env(), внутри Telegram —
+       WebApp API: системная зона (статус-бар, Home-индикатор) плюс зона кнопок
+       Telegram «Закрыть» и «⋯» в полноэкранном режиме. */
+    --app-safe-top: env(safe-area-inset-top, 0px);
+    --app-safe-bottom: env(safe-area-inset-bottom, 0px);
+    /* Расстояние от нижнего меню до края экрана и место, которое меню занимает. */
+    --app-mobile-nav-offset: max(0.5rem, var(--app-safe-bottom));
+    --app-mobile-nav-space: calc(var(--app-mobile-nav-offset) + 4.5rem);
+    /* Верхняя граница видимой области: под ней ничего не прячется при прокрутке. */
+    --app-sticky-top: var(--app-safe-top);
+  }
+  html[data-telegram-mini-app='true'] {
+    --app-safe-top: max(
+      env(safe-area-inset-top, 0px),
+      calc(var(--tg-safe-area-inset-top, 0px) + var(--tg-content-safe-area-inset-top, 0px))
+    );
+    --app-safe-bottom: max(
+      env(safe-area-inset-bottom, 0px),
+      calc(var(--tg-safe-area-inset-bottom, 0px) + var(--tg-content-safe-area-inset-bottom, 0px))
     );
   }
-  @media (max-width: 1023px) {
-    html[data-telegram-mini-app='true'] {
-      --telegram-miniapp-top-offset: 4rem;
-      --telegram-miniapp-bottom-offset: 1rem;
-    }
+  /* В кабинете нового дизайна на телефоне сверху липкая шапка высотой 3.5rem.
+     Внутри Telegram шапка уезжает при прокрутке, остаётся только плашка безопасной зоны. */
+  .dashboard-shell[data-design='v2'] {
+    --app-sticky-top: calc(var(--app-safe-top) + 3.5rem);
+  }
+  html[data-telegram-mini-app='true'] .dashboard-shell[data-design='v2'] {
+    --app-sticky-top: var(--app-safe-top);
   }
   html, body { @apply h-full; }
   html {
@@ -101,6 +117,26 @@
   }
   .admin-list-row {
     @apply transition-colors hover:bg-slate-50/60 dark:hover:bg-white/[0.02];
+  }
+  /* Плашка под статус-баром и кнопками Telegram: контент при прокрутке уходит
+     под неё, а не под системные элементы. Вне Telegram её высота нулевая. */
+  .telegram-safe-top-cap {
+    display: none;
+  }
+  html[data-telegram-mini-app='true'] .telegram-safe-top-cap {
+    position: fixed;
+    inset: 0 0 auto;
+    z-index: 45;
+    display: block;
+    height: var(--app-safe-top);
+    background: color-mix(in srgb, var(--app-bg) 94%, transparent);
+    -webkit-backdrop-filter: blur(14px);
+    backdrop-filter: blur(14px);
+  }
+  /* Внутри Telegram шапка кабинета не липнет: иначе вместе со статус-баром
+     и кнопками Telegram она постоянно занимает пятую часть экрана. */
+  html[data-telegram-mini-app='true'] .dashboard-topbar-v2 {
+    position: relative;
   }
   .nav-active-glow {
     box-shadow: none;
@@ -318,7 +354,7 @@
     @apply transition-colors hover:bg-slate-50/80 dark:hover:bg-white/[0.025];
   }
   .admin-bulk-bar {
-    @apply sticky bottom-[calc(env(safe-area-inset-bottom)+5.25rem)] z-30 flex flex-col gap-3 rounded-2xl border border-slate-300
+    @apply sticky bottom-[calc(var(--app-mobile-nav-space)+0.25rem)] z-30 flex flex-col gap-3 rounded-2xl border border-slate-300
            bg-white/95 p-3 shadow-lg shadow-slate-950/10 backdrop-blur dark:border-white/15 dark:bg-surface-900/95
            sm:bottom-4 sm:flex-row sm:items-center sm:justify-between;
   }

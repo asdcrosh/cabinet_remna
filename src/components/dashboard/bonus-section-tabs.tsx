@@ -10,7 +10,7 @@ export function BonusSectionTabs({ active }: { active: 'bonuses' | 'invite' }) {
     { id: 'invite' as const, href: '/dashboard/referrals', label: 'Пригласить друга', icon: UsersRound },
   ]
   return (
-    <nav aria-label="Разделы бонусов" className="flex gap-1 overflow-x-auto rounded-xl border border-slate-200 bg-white p-1 dark:border-white/10 dark:bg-white/[0.03] sm:w-fit">
+    <nav aria-label="Разделы бонусов" className="grid grid-cols-2 gap-1 rounded-xl border border-slate-200 bg-white p-1 dark:border-white/10 dark:bg-white/[0.03] sm:flex sm:w-fit">
       {tabs.map((tab) => {
         const Icon = tab.icon
         const current = tab.id === active
@@ -20,14 +20,14 @@ export function BonusSectionTabs({ active }: { active: 'bonuses' | 'invite' }) {
             href={tab.href}
             aria-current={current ? 'page' : undefined}
             className={cn(
-              'flex min-h-10 flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3.5 text-sm font-semibold transition-colors sm:flex-none',
+              'flex min-h-10 min-w-0 items-center justify-center gap-1.5 rounded-lg px-2 text-[13px] font-semibold transition-colors sm:flex-none sm:gap-2 sm:px-3.5 sm:text-sm',
               current
                 ? 'bg-slate-950 text-white dark:bg-white dark:text-slate-950'
                 : 'text-slate-500 hover:bg-slate-100 hover:text-slate-950 dark:text-slate-400 dark:hover:bg-white/[0.06] dark:hover:text-white'
             )}
           >
-            <Icon className="h-4 w-4" />
-            {tab.label}
+            <Icon className="h-4 w-4 shrink-0" />
+            <span className="truncate">{tab.label}</span>
           </Link>
         )
       })}

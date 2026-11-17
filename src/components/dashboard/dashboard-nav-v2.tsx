@@ -293,7 +293,7 @@ export function MobileTabBarV2({
   return (
     <nav
       aria-label="Нижнее меню"
-      className="dashboard-mobile-nav fixed inset-x-2 bottom-[max(.5rem,env(safe-area-inset-bottom),var(--tg-content-safe-area-inset-bottom,0px),var(--telegram-miniapp-bottom-offset,0px))] z-40 rounded-xl border p-1.5 backdrop-blur xl:hidden"
+      className="dashboard-mobile-nav fixed inset-x-2 bottom-[var(--app-mobile-nav-offset)] z-40 rounded-xl border p-1.5 backdrop-blur xl:hidden"
     >
       <div className="mx-auto grid max-w-md gap-1" style={{ gridTemplateColumns: `repeat(${Math.max(1, columns)}, minmax(0, 1fr))` }}>
         {tabs.map((item) => {
@@ -353,7 +353,7 @@ export function MobileTabBarV2({
             aria-modal="true"
             aria-labelledby="mobile-admin-more-title"
             tabIndex={-1}
-            className="absolute inset-x-0 bottom-0 max-h-[calc(100dvh-var(--telegram-miniapp-safe-top)-1rem)] overflow-y-auto overscroll-contain rounded-t-xl border border-slate-300 bg-surface-50 p-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] shadow-xl dark:border-white/10 dark:bg-surface-950"
+            className="absolute inset-x-0 bottom-0 max-h-[calc(100dvh-var(--app-safe-top)-1rem)] overflow-y-auto overscroll-contain rounded-t-xl border border-slate-300 bg-surface-50 p-4 pb-[calc(var(--app-safe-bottom)+1rem)] shadow-xl dark:border-white/10 dark:bg-surface-950"
           >
             <div className="mb-3 flex items-center justify-between gap-3">
               <div id="mobile-admin-more-title" className="font-semibold text-slate-950 dark:text-white">Разделы админки</div>
