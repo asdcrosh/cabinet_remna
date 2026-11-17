@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, type FormEvent } from 'react'
+import Image from 'next/image'
 import { ArrowUpRight, Bell, Check, Copy, CreditCard, Gift, Headphones, Home, LayoutGrid, LoaderCircle, Lock, RefreshCw, Settings as SettingsIcon, Shield, Smartphone, Sparkles, Trophy, Users, Wallet, Wifi, Wrench, X } from 'lucide-react'
 import { BrandLogo } from '@/components/brand-logo'
 import { DevicesList } from '@/components/dashboard/devices-list'
@@ -42,7 +43,7 @@ async function request<T>(url: string, body?: unknown, method?: 'POST' | 'PATCH'
   return data as T
 }
 
-export function MiniApp({ demo = false, brandName = 'VPN Cabinet' }: { demo?: boolean; brandName?: string }) {
+export function MiniApp({ demo = false, brandName = 'VPN Cabinet', bannerUrl }: { demo?: boolean; brandName?: string; bannerUrl?: string }) {
   const [data, setData] = useState<MiniAppOverview | null>(demo ? miniAppDemo : null)
   const [tab, setTab] = useState<Tab>('home')
   const [error, setError] = useState('')
@@ -343,7 +344,7 @@ export function MiniApp({ demo = false, brandName = 'VPN Cabinet' }: { demo?: bo
       {data && <>
         {data.warning && <div className={styles.alert}>{data.warning}</div>}
         {tab === 'home' && <>
-          <div className={styles.banner} aria-hidden="true" />
+          {bannerUrl && <Image className={styles.banner} src={bannerUrl} alt="" width={1200} height={450} unoptimized referrerPolicy="no-referrer" />}
           <div className={styles.intro}><span>Кабинет / {data.name}</span><h1>Ваш доступ<br /><em>в одном месте.</em></h1></div>
           <section className={styles.pass} aria-label="Моя подписка"><div className={styles.passTop}><span className={styles.pill}><span className={sub?.usable ? styles.dot : styles.offDot} />{sub?.title || 'Доступ ещё не подключён'}</span><Shield size={28} /></div>
             <div className={styles.passBody}><small>ВАШ ДОСТУП</small><h2>{sub?.planName || brandName}</h2><p>{sub ? `До ${date}` : 'Начните с выбора подписки'}</p></div>
@@ -444,7 +445,7 @@ export function MiniApp({ demo = false, brandName = 'VPN Cabinet' }: { demo?: bo
         {tab === 'settings' && <section><Heading eyebrow="ВАШ ПРОФИЛЬ" title="Настройки" description="Каналы уведомлений и данные аккаунта." />
           <article className={styles.plan}><div><small>АККАУНТ</small>
             <h2>{me?.name || data.name}</h2>
-            <p>{demo ? 'demo@alekseevvp.example' : me?.email || 'Загружаем…'}</p>
+            <p>{demo ? 'demo@example.test' : me?.email || 'Загружаем…'}</p>
             <p>Telegram привязан — вход и уведомления работают через него.</p></div></article>
           <article className={styles.plan}><div><small>УВЕДОМЛЕНИЯ</small><h2>Каналы связи</h2></div>
             {([['inAppEnabled', 'В кабинете', 'Лента событий в разделе «Уведомления»'], ['telegramEnabled', 'Telegram', 'Сообщения от бота'], ['emailEnabled', 'Email', 'Письма на почту'], ['broadcastsEnabled', 'Рассылки', 'Новости и акции сервиса']] as Array<[keyof Prefs, string, string]>).map(([key, title, hint]) =>

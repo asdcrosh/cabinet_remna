@@ -19,3 +19,15 @@ export function miniAppUrl() {
   if (url.protocol !== 'https:' && process.env.NODE_ENV === 'production') throw new Error('HTTPS is required')
   return url.toString()
 }
+
+export function miniAppBannerUrl() {
+  const value = process.env.TELEGRAM_MINIAPP_BANNER_URL?.trim()
+  if (!value) return undefined
+
+  try {
+    const url = new URL(value)
+    if (url.protocol === 'https:' && !url.username && !url.password) return url.href
+  } catch {
+    return undefined
+  }
+}

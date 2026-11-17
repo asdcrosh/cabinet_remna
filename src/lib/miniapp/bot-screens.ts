@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { getMiniAppOverview } from './overview'
 import { buildAdminTicketsScreen, buildBroadcastThemesScreen, buildRichScreen, buildRichPaymentScreen, buildSupportThreadScreen, type BotScreen, type BotThreadMessage, type RichScreenInput } from './rich-screens'
 import { broadcastThemes, broadcastThemeView } from './broadcast-bot'
-import { miniAppUrl } from './config'
+import { miniAppBannerUrl, miniAppUrl } from './config'
 import { botSupportAttachmentUrl } from './attachment-sign'
 import { channelCampaign } from './channel-referrals'
 import { ensureUserReferralCode } from '@/lib/referrals'
@@ -27,7 +27,7 @@ export async function getBotScreenInput(telegramId: number, screen: BotScreen, n
   const appUrl = new URL(miniAppUrl())
   if (referralCode) appUrl.searchParams.set('ref', referralCode)
   const input: RichScreenInput = { screen, appUrl: appUrl.toString(), overview: user ? await getMiniAppOverview(user.id) : null,
-    bannerUrl: process.env.TELEGRAM_MINIAPP_BANNER_URL, brandName: getBrandName(), notice,
+    bannerUrl: miniAppBannerUrl(), brandName: getBrandName(), notice,
     admin: Boolean(user && user.role !== 'USER') }
   if (user && input.overview) {
     if (screen === 'devices' && hasRemnawaveUserReference(user)) {
