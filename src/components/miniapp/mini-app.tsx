@@ -2,13 +2,14 @@
 
 import { useEffect, useState, type FormEvent } from 'react'
 import Image from 'next/image'
-import { ArrowUpRight, Bell, Check, Copy, CreditCard, Gift, Headphones, Home, LayoutGrid, LoaderCircle, Lock, RefreshCw, Settings as SettingsIcon, Shield, Smartphone, Sparkles, Trophy, Users, Wallet, Wifi, Wrench, X } from 'lucide-react'
+import { ArrowUpRight, Bell, Check, Copy, CreditCard, Disc3, Gift, Headphones, Home, LayoutGrid, LoaderCircle, Lock, RefreshCw, Settings as SettingsIcon, Smartphone, Users, Wallet, Wifi, Wrench, X } from 'lucide-react'
+import { BonusBoxClientDynamic } from '@/components/bonus-box/bonus-box-client-dynamic'
 import { BrandLogo } from '@/components/brand-logo'
 import { DevicesList } from '@/components/dashboard/devices-list'
 import { KeysCard } from '@/components/dashboard/keys-card'
 import { SupportPanelDynamic } from '@/components/support/support-panel-dynamic'
 import type { SupportTicket } from '@/components/support/support-panel-model'
-import type { BonusBoxMissionView, BonusBoxOverview, OpenBoxResponse } from '@/components/bonus-box/bonus-box-types'
+import type { BonusBoxOverview } from '@/components/bonus-box/bonus-box-types'
 import { getTelegramLaunchData, loadTelegramMiniAppSdk, telegramStarsInvoiceUrl } from '@/lib/telegram-miniapp-client'
 import { miniAppDestination } from '@/lib/miniapp/destination'
 import { miniAppDemo, type MiniAppOverview, type TelegramRubleMethod } from '@/lib/miniapp/model'
@@ -26,10 +27,11 @@ type AutoRenewalState = { id: string; status: string; paymentMethodTitle: string
 type AdminStats = { usersTotal: number; usersNew7d: number; activeSubscriptions: number; expiringSoon: number; recoveryCount: number; succeededPayments: number; succeededAmountKopecks: number }
 
 const tabs = [{ id: 'home', label: 'Главная', icon: Home }, { id: 'plans', label: 'Подписка', icon: Wallet },
-  { id: 'devices', label: 'Устройства', icon: Smartphone }, { id: 'bonus', label: 'Бонусы', icon: Gift }, { id: 'menu', label: 'Меню', icon: LayoutGrid }] as const
+  { id: 'devices', label: 'Устройства', icon: Smartphone }, { id: 'bonus', label: 'Рулетка', icon: Disc3 }, { id: 'menu', label: 'Меню', icon: LayoutGrid }] as const
 const knownTabs: Tab[] = ['home', 'plans', 'devices', 'referrals', 'support', 'connect', 'menu', 'billing', 'bonus', 'notifications', 'settings', 'admin']
 const rub = new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })
-const rarityEmoji: Record<string, string> = { COMMON: '⚪', RARE: '🔵', EPIC: '🟣', LEGENDARY: '🟡' }
+const duration = new Intl.NumberFormat('ru-RU', { style: 'unit', unit: 'day', unitDisplay: 'long' })
+const devicePlural = new Intl.PluralRules('ru-RU')
 const renewalStatusLabel: Record<string, string> = {
   AWAITING_PAYMENT_METHOD: 'ждёт привязки карты', ACTIVE: 'включено', PROCESSING: 'списание в обработке',
   RETRYING: 'повторная попытка списания', PAUSED: 'на паузе', DISABLED: 'выключено',
@@ -59,14 +61,13 @@ export function MiniApp({ demo = false, brandName = 'VPN Cabinet', bannerUrl }: 
   const [verifiedTelegramLaunch, setVerifiedTelegramLaunch] = useState(false)
   const [starsInvoice, setStarsInvoice] = useState<{ planId: string; url: string } | null>(null)
   const [checkoutPlanId, setCheckoutPlanId] = useState<string | null>(null)
+  const [requestedPlanId, setRequestedPlanId] = useState<string | null>(null)
   const [botCheckoutGrant, setBotCheckoutGrant] = useState<string | null>(null)
   const [autoRenewal, setAutoRenewal] = useState<AutoRenewalState>(null)
   const [renewalConsent, setRenewalConsent] = useState(false)
   const [bonusData, setBonusData] = useState<BonusBoxOverview | null>(null)
   const [bonusOff, setBonusOff] = useState(false)
-  const [spinning, setSpinning] = useState(false)
-  const [spinResult, setSpinResult] = useState<OpenBoxResponse | null>(null)
-  const [copiedCode, setCopiedCode] = useState<string | null>(null)
+  const [bonusReload, setBonusReload] = useState(0)
   const [inbox, setInbox] = useState<NotificationItem[] | null>(null)
   const [prefs, setPrefs] = useState<Prefs | null>(null)
   const [me, setMe] = useState<Me | null>(null)
@@ -109,6 +110,7 @@ export function MiniApp({ demo = false, brandName = 'VPN Cabinet', bannerUrl }: 
           const requestedPromo = params.get('promo')?.trim()
           if (requestedPlan && result.plans.some(item => item.id === requestedPlan && !item.isPromo)) {
             setTab('plans')
+            setRequestedPlanId(requestedPlan)
             if (params.get('browserCheckout') !== '1' && (result.botCheckout || result.rublePaymentMethods?.length)) setCheckoutPlanId(requestedPlan)
             // Ссылка из бота с применённым промокодом: предзаполняем поле, чтобы скидка применилась автоматически.
             if (requestedPromo) setPromoCodes(previous => ({ ...previous, [requestedPlan]: requestedPromo }))
@@ -147,7 +149,7 @@ export function MiniApp({ demo = false, brandName = 'VPN Cabinet', bannerUrl }: 
             if (!cancelled) { setBonusData(value); setBonusOff(false) }
           } catch (e) {
             if (!cancelled) {
-              if (e instanceof Error && e.message === 'Not found') setBonusOff(true)
+              if (e instanceof Error && e.message === 'Not found') { setBonusData(null); setBonusOff(true) }
               else throw e
             }
           }
@@ -166,16 +168,17 @@ export function MiniApp({ demo = false, brandName = 'VPN Cabinet', bannerUrl }: 
     }
     void load()
     return () => { cancelled = true }
-  }, [tab, Boolean(data), demo]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [tab, Boolean(data), demo, bonusReload]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function refresh() {
     if (demo) { setNotice('Это демонстрация. Данные вымышлены.'); return }
+    if (tab === 'bonus') { setBonusData(null); setBonusReload(value => value + 1) }
     setBusy(true); setError('')
     try { setData(await request<MiniAppOverview>('/api/miniapp/overview')) }
     catch (e) { setError(e instanceof Error ? e.message : 'Не удалось обновить') }
     finally { setBusy(false) }
   }
-  function navigate(next: Tab) { setTab(next); setError(''); setNotice(''); setCopied(false); setSpinResult(null) }
+  function navigate(next: Tab) { setTab(next); setError(''); setNotice(''); setCopied(false) }
   async function claim() {
     setBusy(true); setError('')
     try {
@@ -188,10 +191,6 @@ export function MiniApp({ demo = false, brandName = 'VPN Cabinet', bannerUrl }: 
     if (!referrals) return
     try { await navigator.clipboard.writeText(referrals.url); setCopied(true) }
     catch { setError('Не удалось скопировать. Выделите ссылку и скопируйте вручную.') }
-  }
-  async function copyCode(code: string) {
-    try { await navigator.clipboard.writeText(code); setCopiedCode(code) }
-    catch { setError('Не удалось скопировать промокод.') }
   }
   async function buyPlan(plan: MiniAppOverview['plans'][number]) {
     if (demo) { setNotice('Это демонстрация. Счёт не создаётся.'); return }
@@ -270,29 +269,6 @@ export function MiniApp({ demo = false, brandName = 'VPN Cabinet', bannerUrl }: 
     } catch (e) { setError(e instanceof Error ? e.message : 'Не удалось изменить автопродление') }
     finally { setBusy(false) }
   }
-  async function spin() {
-    if (demo) { setNotice('Это демонстрация. Розыгрыш не выполняется.'); return }
-    setSpinning(true); setError(''); setSpinResult(null)
-    try {
-      const result = await request<OpenBoxResponse>('/api/bonus-box', { spinId: crypto.randomUUID() })
-      setSpinResult(result)
-      setBonusData(await request<BonusBoxOverview>('/api/bonus-box'))
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Розыгрыш временно недоступен')
-      try { setBonusData(await request<BonusBoxOverview>('/api/bonus-box')) } catch { /* обзор обновим при следующем открытии */ }
-    }
-    finally { setSpinning(false) }
-  }
-  async function claimMission(mission: BonusBoxMissionView) {
-    if (demo) { setNotice('Это демонстрация. Награда не начисляется.'); return }
-    setBusy(true); setError('')
-    try {
-      await request(`/api/bonus-box/missions/${mission.id}/claim`, {})
-      setNotice(`Награда получена: +${mission.rewardAttempts} попыток.`)
-      setBonusData(await request<BonusBoxOverview>('/api/bonus-box'))
-    } catch (e) { setError(e instanceof Error ? e.message : 'Не удалось получить награду') }
-    finally { setBusy(false) }
-  }
   async function markAllRead() {
     if (demo) { setNotice('Это демонстрация. Уведомления не меняются.'); return }
     setBusy(true); setError('')
@@ -327,6 +303,8 @@ export function MiniApp({ demo = false, brandName = 'VPN Cabinet', bannerUrl }: 
   const checkoutTotalKopecks = checkoutPlan ? checkoutPlan.priceKopecks + checkoutExtraKopecks : 0
   const date = sub?.expiresAt ? new Date(sub.expiresAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' }) : 'Без ограничения срока'
   const currentPlan = data?.plans.find(plan => plan.current && !plan.isPromo) ?? null
+  const featuredPlan = data?.plans.find(plan => plan.id === requestedPlanId) ?? currentPlan
+  const plans = featuredPlan && data ? [featuredPlan, ...data.plans.filter(plan => plan.id !== featuredPlan.id)] : data?.plans ?? []
   const unreadCount = inbox?.filter(item => !item.readAt).length ?? 0
   const renewalOn = Boolean(autoRenewal && autoRenewal.status !== 'DISABLED')
   const menuItems: Array<{ id: Tab; icon: typeof Wallet; title: string; hint: string; badge?: number }> = [
@@ -350,30 +328,49 @@ export function MiniApp({ demo = false, brandName = 'VPN Cabinet', bannerUrl }: 
         {data.warning && <div className={styles.alert}>{data.warning}</div>}
         {tab === 'home' && <>
           {bannerUrl && <Image className={styles.banner} src={bannerUrl} alt="" width={1200} height={450} unoptimized referrerPolicy="no-referrer" />}
-          <div className={styles.intro}><span>Кабинет / {data.name}</span><h1>Ваш доступ<br /><em>в одном месте.</em></h1></div>
-          <section className={styles.pass} aria-label="Моя подписка"><div className={styles.passTop}><span className={styles.pill}><span className={sub?.usable ? styles.dot : styles.offDot} />{sub?.title || 'Доступ ещё не подключён'}</span><Shield size={28} /></div>
-            <div className={styles.passBody}><small>ВАШ ДОСТУП</small><h2>{sub?.planName || brandName}</h2><p>{sub ? `До ${date}` : 'Начните с выбора подписки'}</p></div>
-            <div className={styles.passBottom}><div><strong>{sub?.daysLeft == null ? (sub ? '∞' : '0') : Math.max(0, sub.daysLeft)}</strong><span>дней доступа</span></div><div><strong>{data.deviceCount}<i> / {sub?.deviceLimit ?? '∞'}</i></strong><span>устройств в кабинете</span></div></div>
+          <Heading title="Моя подписка" />
+          <section className={styles.pass} aria-label="Статус подписки">
+            <div className={styles.passTop}><span className={styles.pill}><span className={sub?.usable ? styles.dot : styles.offDot} />{sub?.title || 'Подписки пока нет'}</span></div>
+            <div className={styles.passBody}>
+              <h2>{sub?.planName || 'VPN-доступ'}</h2>
+              <p>{sub ? sub.expiresAt ? `Действует до ${date}` : date : 'Выберите тариф, чтобы подключить VPN.'}</p>
+            </div>
+            {sub && <dl className={styles.passBottom}>
+              <div><dt>Осталось</dt><dd>{sub.daysLeft == null ? 'Без срока' : duration.format(Math.max(0, sub.daysLeft))}</dd></div>
+              <div><dt>Устройства</dt><dd>{data.deviceCount} из {sub.deviceLimit ?? '∞'}</dd></div>
+            </dl>}
+            <button className={styles.primary} onClick={() => navigate(sub?.usable ? 'connect' : 'plans')}>
+              <Wifi size={19} />{sub?.usable ? 'Подключить VPN' : 'Выбрать тариф'}<ArrowUpRight size={18} />
+            </button>
           </section>
-          <button className={styles.primary} onClick={() => navigate(sub?.usable ? 'connect' : 'plans')}><Wifi size={20} />{sub?.usable ? 'Подключить VPN' : 'Посмотреть тарифы'}<ArrowUpRight size={20} /></button>
-          <div className={styles.quick}><button onClick={() => navigate('plans')}><Wallet /><b>Тарифы</b><span>Условия из кабинета</span></button><button onClick={() => navigate('devices')}><Smartphone /><b>Устройства</b><span>Всё под контролем</span></button></div>
-          {data.referrals && <button className={styles.invite} onClick={() => navigate('referrals')}><Gift size={27} /><span><b>Хорошим делятся</b><small>Приглашайте друзей и получайте дни VPN</small></span><ArrowUpRight size={20} /></button>}
-          <p className={styles.footnote}>Подписка общая с вашим личным кабинетом.<br />Статус подключения проверяется в VPN-приложении.</p>
+          <div className={styles.quick}>
+            <button onClick={() => navigate('plans')}><Wallet /><b>{sub?.usable ? 'Продлить подписку' : 'Тарифы'}</b></button>
+            <button onClick={() => navigate('bonus')}><Disc3 /><b>Рулетка подарков</b></button>
+          </div>
+          {data.referrals && <button className={styles.invite} onClick={() => navigate('referrals')}><Gift size={24} /><span><b>Пригласить друга</b><small>Бонусные дни VPN за приглашения</small></span><ArrowUpRight size={18} /></button>}
         </>}
-        {tab === 'menu' && <section><Heading eyebrow="ВСЁ УПРАВЛЕНИЕ" title="Меню кабинета" description="Все разделы сервиса — как в личном кабинете на сайте." />
+        {tab === 'menu' && <section><Heading title="Меню кабинета" description="Все разделы сервиса — как в личном кабинете на сайте." />
           <div className={styles.quick}>{menuItems.map(item => <button key={item.id} onClick={() => navigate(item.id)}>
             <item.icon /><b>{item.title}{item.badge ? ` · ${item.badge}` : ''}</b><span>{item.hint}</span></button>)}</div>
         </section>}
-        {tab === 'plans' && <section><Heading eyebrow="ВАШ ДОСТУП" title="Тарифы и подписка" description="Тарифы и условия обновляются из личного кабинета." />
-          {data.plans.length === 0 && <div className={styles.empty}>Для вашего аккаунта сейчас нет доступных тарифов.</div>}
-          {data.plans.map(plan => <article className={styles.plan} key={plan.id}><div><small>{plan.current ? 'ВАШ ТАРИФ' : brandName}</small>
-              <h2>{plan.name}</h2><p>{plan.unlimited ? 'Без ограничения срока' : `${plan.days} дней`} · {plan.unlimitedDevices ? 'безлимит устройств' : plan.deviceAddonEnabled ? `${plan.devices}–${plan.maxDevices} устройств` : `${plan.initialDevices} устройств`}{plan.trafficLimitGb == null ? ' · безлимит трафика' : ` · ${plan.trafficLimitGb} ГБ`}</p>
+        {tab === 'plans' && <section><Heading title="Тарифы и подписка" />
+          {data.starsEnabled && data.starsRateKopecks && <p className={styles.rate}>Курс Stars · 1 ⭐ = {(data.starsRateKopecks / 100).toLocaleString('ru-RU')} ₽</p>}
+          {plans.length === 0 && <div className={styles.empty}>Для вашего аккаунта сейчас нет доступных тарифов.</div>}
+          {plans.map(plan => <article className={styles.plan} key={plan.id}><div>
+              <div className={styles.planHead}>
+                <div>{plan.current && <span className={styles.currentPlan}>Ваш тариф</span>}<h2>{plan.name}</h2></div>
+                <strong>{plan.isPromo ? '0 ₽' : rub.format(plan.priceKopecks / 100)}</strong>
+              </div>
+              <p className={styles.planMeta}>
+                <span>{plan.unlimited ? 'Бессрочно' : duration.format(plan.days)}</span>
+                <span>{plan.unlimitedDevices ? 'Безлимит устройств' : plan.deviceAddonEnabled ? `${plan.devices}–${plan.maxDevices} устройств` : formatDeviceCount(plan.initialDevices)}</span>
+                <span>{plan.trafficLimitGb == null ? 'Безлимит трафика' : `${plan.trafficLimitGb} ГБ`}</span>
+              </p>
               {plan.description && <p>{plan.description}</p>}
               {plan.isPlanSwitch && <p className={styles.planNote}>При смене тарифа начнётся новый срок. Оставшиеся дни текущего тарифа не переносятся.</p>}
             </div>
-            {!plan.isPromo && <div className={styles.rublePrice}><span>Стоимость в кабинете</span><strong>{rub.format(plan.priceKopecks / 100)}</strong></div>}
             {!plan.isPromo && <>
-              <button className={styles.sitePay} onClick={() => openBrowserCheckout(plan)}>Открыть кабинет в браузере<ArrowUpRight size={18} /></button>
+              <button className={styles.sitePay} onClick={() => openBrowserCheckout(plan)}>Оплата на сайте<ArrowUpRight size={18} /></button>
               {methodsForPlan(plan.id).length > 0 && <button className={styles.sitePay} onClick={() => setCheckoutPlanId(plan.id)}><CreditCard size={18} />Оплата в Telegram<ArrowUpRight size={18} /></button>}
             </>}
             {data.starsEnabled && data.starsRateKopecks && <div className={styles.planBuy}>
@@ -382,16 +379,20 @@ export function MiniApp({ demo = false, brandName = 'VPN Cabinet', bannerUrl }: 
                   {Array.from({ length: plan.maxDevices - plan.devices + 1 }, (_, index) => plan.devices + index).map(limit =>
                     <option key={limit} value={limit}>{limit}</option>)}
                 </select></label>}
-              <div className={styles.planPrice}>{plan.isPromo ? 'Бесплатно' : `${Math.ceil((plan.priceKopecks + Math.max(0, (selectedLimits[plan.id] ?? plan.initialDevices) - plan.devices) * plan.extraDevicePriceKopecks) / data.starsRateKopecks)} Stars`}</div>
-              {!plan.isPromo && <input className={styles.linkInput} aria-label={`Промокод для ${plan.name}`} placeholder="Промокод, если есть" value={promoCodes[plan.id] ?? ''} onChange={e => setPromoCodes(previous => ({ ...previous, [plan.id]: e.target.value }))} />}
-              <p>Курс: 1 Star = {(data.starsRateKopecks / 100).toLocaleString('ru-RU')} ₽. Это цена до скидки. Итоговая сумма появится в счёте; подписка продлится по правилам кабинета.</p>
+              {!plan.isPromo && <>
+                <div className={styles.starsPrice}><span>Стоимость в Stars{promoCodes[plan.id]?.trim() && ' до скидки'}</span><strong>{Math.ceil((plan.priceKopecks + Math.max(0, (selectedLimits[plan.id] ?? plan.initialDevices) - plan.devices) * plan.extraDevicePriceKopecks) / data.starsRateKopecks)} ⭐</strong></div>
+                <details className={styles.promo} open={promoCodes[plan.id]?.trim() ? true : undefined}>
+                  <summary>Промокод</summary>
+                  <input className={styles.linkInput} aria-label={`Промокод для ${plan.name}`} placeholder="Введите промокод" value={promoCodes[plan.id] ?? ''} onChange={e => setPromoCodes(previous => ({ ...previous, [plan.id]: e.target.value }))} />
+                </details>
+              </>}
               {starsInvoice?.planId === plan.id
                 ? <a className={styles.primary} href={starsInvoice.url} target="_blank" rel="noopener noreferrer">Открыть счёт Stars в Telegram<ArrowUpRight size={18} /></a>
                 : <button className={styles.primary} disabled={busy} onClick={() => void buyPlan(plan)}>{plan.isPromo ? 'Получить доступ' : 'Оплатить Stars'}<ArrowUpRight size={18} /></button>}
             </div>}
             </article>)}
         </section>}
-        {tab === 'billing' && <section><Heading eyebrow="ОПЛАТЫ" title="Платежи" description="История оплат и автопродление — как в кабинете на сайте." />
+        {tab === 'billing' && <section><Heading title="Платежи" description="История оплат и автопродление — как в кабинете на сайте." />
           <article className={styles.plan}><div><small>АВТОПРОДЛЕНИЕ</small>
             <h2>{renewalOn ? '🟢 ' : '⚪ '}{renewalStatusLabel[autoRenewal?.status ?? 'DISABLED'] ?? autoRenewal?.status}</h2>
             {autoRenewal?.plan && <p>{autoRenewal.plan.name} · {rub.format(autoRenewal.plan.priceKopecks / 100)}{autoRenewal.plan.unlimitedDuration ? '' : ` / ${autoRenewal.plan.durationDays} дней`}</p>}
@@ -409,34 +410,17 @@ export function MiniApp({ demo = false, brandName = 'VPN Cabinet', bannerUrl }: 
           </article>
           <div className={styles.history}><h2>История платежей</h2>{payments === null && <p>Загружаем платежи…</p>}{payments?.length === 0 && <p>Платежей пока нет.</p>}{payments?.slice(0, 20).map(payment => <div className={styles.order} key={payment.id}><span><b>{payment.plan?.name || 'Подписка'}</b><small>{new Date(payment.createdAt).toLocaleDateString('ru-RU')} · {payment.provider}</small></span><span><b>{rub.format(payment.amountKopecks / 100)}</b><small>{payment.status === 'SUCCEEDED' ? 'Оплачено' : payment.status === 'PENDING' ? 'Ожидает оплаты' : payment.status === 'REFUNDED' ? 'Возврат' : 'Не оплачено'}</small></span></div>)}</div>
         </section>}
-        {tab === 'bonus' && <section><Heading eyebrow="ПОДАРКИ" title="Бонусы" description="Колесо подарков, задания и промокоды — те же, что в кабинете." />
-          {bonusOff && <div className={styles.empty}>Бонусная программа сейчас отключена. Загляните позже.</div>}
-          {demo && <div className={styles.card}><div className={styles.bonusHero}><Sparkles size={40} /><h2>Колесо подарков</h2><p>2 попытки · демонстрация</p></div>
-            <button className={styles.primary} onClick={() => setNotice('Это демонстрация. Розыгрыш не выполняется.')}>Крутить колесо<ArrowUpRight size={18} /></button></div>}
-          {!demo && !bonusOff && !bonusData && !busy && <div className={styles.empty}>Не удалось загрузить бонусы.</div>}
-          {!demo && bonusData && <>
-            <article className={styles.plan}><div className={styles.bonusHero}><Sparkles size={40} />
-              <h2>Колесо подарков</h2>
-              <p>{bonusData.attemptsCount > 0 ? `Доступно попыток: ${bonusData.attemptsCount}` : bonusData.canOpenReason || 'Новые попытки — за покупки, задания и друзей'}</p></div>
-              {spinResult && <div className={styles.prizeCard}><b>{rarityEmoji[spinResult.prize.rarity] ?? '🎁'} {spinResult.prize.title}</b>
-                {spinResult.prize.description && <p>{spinResult.prize.description}</p>}
-                {spinResult.promoCode && <button className={styles.secondary} onClick={() => void copyCode(spinResult.promoCode!)}>{copiedCode === spinResult.promoCode ? <Check size={17} /> : <Copy size={17} />}{copiedCode === spinResult.promoCode ? 'Промокод скопирован' : `Промокод: ${spinResult.promoCode}`}</button>}
-                <small>Осталось попыток: {spinResult.remainingAttempts}</small></div>}
-              <button className={styles.primary} disabled={spinning || bonusData.attemptsCount === 0} onClick={() => void spin()}>
-                {spinning ? <LoaderCircle className="animate-spin" size={19} /> : <Trophy size={19} />}{spinning ? 'Крутим…' : bonusData.attemptsCount > 0 ? `Крутить колесо · ${bonusData.attemptsCount}` : 'Пока нет попыток'}<ArrowUpRight size={18} /></button>
-            </article>
-            {bonusData.activePromoRewards.length > 0 && <div className={styles.history}><h2>Ваши промокоды</h2>
-              {bonusData.activePromoRewards.map(reward => <div className={styles.order} key={reward.id}><span><b>{reward.code}</b><small>{reward.prizeTitle}</small></span><span><b>−{reward.discountPercent}%</b><small>{reward.expiresAt ? `до ${new Date(reward.expiresAt).toLocaleDateString('ru-RU')}` : 'бессрочно'}</small></span></div>)}</div>}
-            {bonusData.missions.length > 0 && <div className={styles.history}><h2>Задания</h2>
-              {bonusData.missions.map(mission => <div className={styles.order} key={mission.id}><span><b>{mission.title}</b><small>{mission.completed ? 'Выполнено' : `Прогресс: ${Math.min(mission.value, mission.target)} из ${mission.target}`} · награда {mission.rewardAttempts} попыток</small></span>
-                {mission.completed && !mission.claimed && <button className={styles.claimButton} disabled={busy} onClick={() => void claimMission(mission)}>Забрать</button>}
-                {mission.claimed && <span><small>✅ Получено</small></span>}</div>)}</div>}
-            {bonusData.openings.length > 0 && <div className={styles.history}><h2>Последние призы</h2>
-              {bonusData.openings.slice(0, 5).map(opening => <div className={styles.order} key={opening.id}><span><b>{rarityEmoji[opening.prize.rarity] ?? '🎁'} {opening.prize.title}</b><small>{new Date(opening.createdAt).toLocaleDateString('ru-RU')}</small></span></div>)}</div>}
-            {data.referrals && <button className={styles.invite} onClick={() => navigate('referrals')}><Users size={26} /><span><b>Попытки за друзей</b><small>Приглашайте друзей и получайте бонусы вместе</small></span><ArrowUpRight size={20} /></button>}
-          </>}
+        {tab === 'bonus' && <section>
+          <Heading title="Рулетка подарков" />
+          {demo ? <div className={styles.card}>В рабочем кабинете здесь доступны попытки, призы и задания.</div>
+            : bonusOff ? <div className={styles.empty}>Рулетка временно отключена.</div>
+            : bonusData ? <div className={`dark ${styles.roulette}`}>
+              <BonusBoxClientDynamic initialData={bonusData} referralsEnabled={data.referrals} embedded />
+            </div>
+            : busy ? <div className={styles.empty} role="status"><LoaderCircle className="animate-spin" />Загружаем рулетку…</div>
+            : <button className={styles.secondary} onClick={() => setBonusReload(value => value + 1)}>Загрузить рулетку</button>}
         </section>}
-        {tab === 'notifications' && <section><Heading eyebrow="СОБЫТИЯ" title="Уведомления" description="Важные события подписки и сообщения сервиса." />
+        {tab === 'notifications' && <section><Heading title="Уведомления" description="Важные события подписки и сообщения сервиса." />
           {demo && <div className={styles.card}><p>🔔 Подписка продлена на 30 дней</p><small>01.11.2026 · демонстрация</small></div>}
           {!demo && <>
             {inbox === null && <div className={styles.empty}>Загружаем уведомления…</div>}
@@ -449,7 +433,7 @@ export function MiniApp({ demo = false, brandName = 'VPN Cabinet', bannerUrl }: 
             {inbox?.some(item => item.actionHref) && <p className={styles.footnote}>Ссылки из уведомлений открывают разделы кабинета в этом же окне.</p>}
           </>}
         </section>}
-        {tab === 'settings' && <section><Heading eyebrow="ВАШ ПРОФИЛЬ" title="Настройки" description="Каналы уведомлений и данные аккаунта." />
+        {tab === 'settings' && <section><Heading title="Настройки" description="Каналы уведомлений и данные аккаунта." />
           <article className={styles.plan}><div><small>АККАУНТ</small>
             <h2>{me?.name || data.name}</h2>
             <p>{demo ? 'demo@example.test' : me?.email || 'Загружаем…'}</p>
@@ -461,7 +445,7 @@ export function MiniApp({ demo = false, brandName = 'VPN Cabinet', bannerUrl }: 
           </article>
           <a className={styles.secondary} href="/dashboard/settings">Профиль и безопасность в кабинете<ArrowUpRight size={18} /></a>
         </section>}
-        {tab === 'admin' && <section><Heading eyebrow="СЕРВИС" title="Управление" description="Статистика сервиса и вход в панель администратора." />
+        {tab === 'admin' && <section><Heading title="Управление" description="Статистика сервиса и вход в панель администратора." />
           {!data.admin && <div className={styles.empty}>Раздел доступен администраторам.</div>}
           {data.admin && demo && <div className={styles.card}><p>Демонстрация: статистика недоступна.</p></div>}
           {data.admin && !demo && <>
@@ -477,13 +461,13 @@ export function MiniApp({ demo = false, brandName = 'VPN Cabinet', bannerUrl }: 
             <a className={styles.primary} href="/dashboard/admin"><Wrench size={19} />Открыть панель управления<ArrowUpRight size={18} /></a>
           </>}
         </section>}
-        {tab === 'devices' && <section><Heading eyebrow="ПОДКЛЮЧЕНИЯ" title="Ваши устройства" description="Одно подключение для всех ваших экранов." />
+        {tab === 'devices' && <section><Heading title="Ваши устройства" description="Одно подключение для всех ваших экранов." />
           {demo ? <div className={styles.card}><div className={styles.device}><Smartphone /><span><b>iPhone</b><small>iOS · Rabbit Hole</small></span><Check /></div><div className={styles.device}><Smartphone /><span><b>MacBook</b><small>macOS · Rabbit Hole</small></span><Check /></div></div> : <DevicesList deviceLimit={sub?.deviceLimit} />}
           <button id="add-device-guide" className={styles.primary} onClick={() => navigate('connect')}>Подключить устройство<ArrowUpRight size={20} /></button></section>}
-        {tab === 'connect' && <section><Heading eyebrow="БЫСТРЫЙ СТАРТ" title="Подключить VPN" description="Установите приложение, добавьте подписку и включите подключение." />
+        {tab === 'connect' && <section><Heading title="Подключить VPN" description="Установите приложение, добавьте подписку и включите подключение." />
           {demo ? <div className={styles.card}><p>1. Установите VPN-клиент</p><p>2. Добавьте подписку {brandName}</p><p>3. Включите VPN в приложении</p><small>Персональная ссылка появится после входа.</small></div>
             : subscriptionUrl ? <KeysCard subscriptionUrl={subscriptionUrl} supportEnabled={data.support} deviceLimit={sub?.deviceLimit} /> : !busy && <div className={styles.empty}>Ссылка пока недоступна. Проверьте состояние подписки.</div>}</section>}
-        {tab === 'referrals' && <section><Heading eyebrow="ПРИГЛАШАЙТЕ ДРУЗЕЙ" title="Больше дней вместе" description={referrals?.condition || 'Новый пользователь приходит по вашей ссылке и вступает в канал. Условия бонуса задаёт сервис.'} />
+        {tab === 'referrals' && <section><Heading title="Больше дней вместе" description={referrals?.condition || 'Новый пользователь приходит по вашей ссылке и вступает в канал. Условия бонуса задаёт сервис.'} />
           <div className={styles.refHero}><Gift size={48} /><h2>Ваша рекомендация.<br />Наше спасибо.</h2><p>Бонусы поступают на ту же подписку, которой вы уже пользуетесь.</p></div>
           <div className={styles.quick}><div><strong>{referrals?.invited ?? 0}</strong><span>приглашено</span></div><div><strong>{referrals?.claimed ?? 0}</strong><span>бонусов подтверждено</span></div></div>
           {demo ? <div className={styles.notice}>Размер бонуса и канал ожидают настройки.</div> : referrals && <>
@@ -493,15 +477,15 @@ export function MiniApp({ demo = false, brandName = 'VPN Cabinet', bannerUrl }: 
             {referrals.eligible && <button className={styles.secondary} disabled={busy || Boolean(referrals.claimedAt)} onClick={() => void claim()}>{referrals.claimedAt ? 'Бонус подтверждён' : 'Я вступил, проверить'}</button>}
           </>}
         </section>}
-        {tab === 'support' && <section><Heading eyebrow="МЫ НА СВЯЗИ" title="Поможем разобраться" description="Опишите, что произошло. История обращений общая с кабинетом." />
+        {tab === 'support' && <section><Heading title="Поможем разобраться" description="Опишите, что произошло. История обращений общая с кабинетом." />
           {demo ? <DemoSupport /> : tickets && <SupportPanelDynamic mode="user" initialTickets={tickets} />}</section>}
-        {busy && <div role="status" className={styles.loading}><LoaderCircle className="animate-spin" size={18} />Загрузка…</div>}
+        {busy && tab !== 'bonus' && <div role="status" className={styles.loading}><LoaderCircle className="animate-spin" size={18} />Загрузка…</div>}
         {checkoutPlan && methodsForPlan(checkoutPlan.id).length > 0 && <div className={styles.sheetBackdrop} onClick={() => setCheckoutPlanId(null)}>
           <section className={styles.sheet} role="dialog" aria-modal="true" aria-label="Оплата подписки" onClick={event => event.stopPropagation()}>
             <button className={styles.sheetClose} aria-label="Закрыть оплату" onClick={() => setCheckoutPlanId(null)}><X size={18} /></button>
             <small className={styles.sheetEyebrow}>{brandName} · Заказ</small>
             <h2>{checkoutPlan.name}</h2>
-            <p className={styles.sheetSub}>{checkoutPlan.unlimited ? 'Без ограничения срока' : `${checkoutPlan.days} дней`} · {checkoutPlan.unlimitedDevices ? 'безлимит устройств' : `${checkoutLimit} устройств`}{checkoutPlan.trafficLimitGb == null ? ' · безлимит трафика' : ` · ${checkoutPlan.trafficLimitGb} ГБ`}</p>
+            <p className={styles.sheetSub}>{checkoutPlan.unlimited ? 'Бессрочно' : duration.format(checkoutPlan.days)} · {checkoutPlan.unlimitedDevices ? 'безлимит устройств' : formatDeviceCount(checkoutLimit)}{checkoutPlan.trafficLimitGb == null ? ' · безлимит трафика' : ` · ${checkoutPlan.trafficLimitGb} ГБ`}</p>
             {checkoutPlan.deviceAddonEnabled && !checkoutPlan.unlimitedDevices && <label className={styles.sheetField}>Количество устройств
               <select value={checkoutLimit} onChange={e => setSelectedLimits(previous => ({ ...previous, [checkoutPlan.id]: Number(e.target.value) }))}>
                 {Array.from({ length: checkoutPlan.maxDevices - checkoutPlan.devices + 1 }, (_, index) => checkoutPlan.devices + index).map(limit =>
@@ -510,7 +494,7 @@ export function MiniApp({ demo = false, brandName = 'VPN Cabinet', bannerUrl }: 
             <input className={styles.linkInput} aria-label="Промокод" placeholder="Промокод, если есть" value={promoCodes[checkoutPlan.id] ?? ''}
               onChange={e => setPromoCodes(previous => ({ ...previous, [checkoutPlan.id]: e.target.value }))} />
             <div className={styles.sheetLines}>
-              <div className={styles.sheetLine}><span>{checkoutPlan.name} · {checkoutPlan.unlimited ? 'бессрочно' : `${checkoutPlan.days} дней`}</span><b>{rub.format(checkoutPlan.priceKopecks / 100)}</b></div>
+              <div className={styles.sheetLine}><span>{checkoutPlan.name} · {checkoutPlan.unlimited ? 'бессрочно' : duration.format(checkoutPlan.days)}</span><b>{rub.format(checkoutPlan.priceKopecks / 100)}</b></div>
               {checkoutExtraKopecks > 0 && <div className={styles.sheetLine}><span>Дополнительные устройства · {checkoutLimit - checkoutPlan.devices}</span><b>+{rub.format(checkoutExtraKopecks / 100)}</b></div>}
             </div>
             <div className={styles.sheetTotal}><span>Итого{promoCodes[checkoutPlan.id]?.trim() ? ' до скидки' : ''}</span><strong>{rub.format(checkoutTotalKopecks / 100)}</strong></div>
@@ -528,8 +512,13 @@ export function MiniApp({ demo = false, brandName = 'VPN Cabinet', bannerUrl }: 
   </main>
 }
 
-function Heading({ eyebrow, title, description }: { eyebrow: string; title: string; description: string }) {
-  return <div className={styles.heading}><small>{eyebrow}</small><h1>{title}</h1><p>{description}</p></div>
+function Heading({ title, description }: { title: string; description?: string }) {
+  return <div className={styles.heading}><h1>{title}</h1>{description && <p>{description}</p>}</div>
+}
+
+function formatDeviceCount(count: number) {
+  const plural = devicePlural.select(count)
+  return `${count} ${plural === 'one' ? 'устройство' : plural === 'few' ? 'устройства' : 'устройств'}`
 }
 function DemoSupport() {
   const [message, setMessage] = useState('')

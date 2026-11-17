@@ -77,10 +77,12 @@ type RoulettePhase = "idle" | RouletteMotionPhase | "locked" | "revealing" | "er
 export function BonusBoxClient({
   initialData,
   compact = false,
+  embedded = false,
   referralsEnabled = true,
 }: {
   initialData: BonusBoxOverview;
   compact?: boolean;
+  embedded?: boolean;
   referralsEnabled?: boolean;
 }) {
   const [data, setData] = useState(initialData);
@@ -766,16 +768,18 @@ export function BonusBoxClient({
         <div className="bonus-box-stage-header flex flex-wrap items-center justify-between gap-3 border-b border-brand-200/70 px-4 py-4 dark:border-brand-300/10 sm:px-6">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="font-mono text-xs font-semibold uppercase tracking-[0.18em] text-brand-600 dark:text-brand-300">Программа наград</span>
-              <span className="h-1 w-1 rounded-full bg-fuchsia-400" />
+              {!embedded && <>
+                <span className="font-mono text-xs font-semibold uppercase tracking-[0.18em] text-brand-600 dark:text-brand-300">Программа наград</span>
+                <span className="h-1 w-1 rounded-full bg-fuchsia-400" />
+              </>}
               <span className="text-xs font-medium text-slate-500 dark:text-slate-400">{availableNow} {attemptWord(availableNow)}</span>
             </div>
-            <h2 className="mt-1 text-lg font-semibold tracking-tight text-slate-950 dark:text-white sm:text-xl">Получить бонус</h2>
+            {!embedded && <h2 className="mt-1 text-lg font-semibold tracking-tight text-slate-950 dark:text-white sm:text-xl">Получить бонус</h2>}
           </div>
-          <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+          {!embedded && <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
             <span className={cn("h-2 w-2 rounded-full", opening ? "animate-pulse bg-fuchsia-400" : "bg-cyan-400")} />
             <span aria-live="polite">{opening ? "Определяем подарок" : result ? `${rarityLabel(result.prize.rarity)} результат` : noAttempts ? "Попытки закончились" : data.canOpenReason ? "Недоступно" : "Готово"}</span>
-          </div>
+          </div>}
         </div>
 
         {rouletteItems.length > 0 && (
