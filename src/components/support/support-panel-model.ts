@@ -219,6 +219,31 @@ export function insertAtSelection(value: string, insert: string, start: number, 
   }
 }
 
+export type SupportDraftStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>
+
+export function getSupportDraftKey(mode: 'user' | 'admin', ticketId: string) {
+  return `support-draft:${mode}:${ticketId}`
+}
+
+export function readSupportDraft(storage: SupportDraftStorage, key: string) {
+  try {
+    return storage.getItem(key) ?? ''
+  } catch {
+    return ''
+  }
+}
+
+// Пишем сразу, без отложенного таймера: смена статуса или папки тут же
+// переключает обращение, и отложенная запись отменялась вместе с эффектом.
+export function saveSupportDraft(storage: SupportDraftStorage, key: string, value: string) {
+  try {
+    if (value.trim()) storage.setItem(key, value)
+    else storage.removeItem(key)
+  } catch {
+    // Хранилище недоступно или переполнено: черновик остаётся только в поле ввода.
+  }
+}
+
 export function formatSupportDate(value: string) {
   return new Intl.DateTimeFormat('ru-RU', {
     day: '2-digit',
