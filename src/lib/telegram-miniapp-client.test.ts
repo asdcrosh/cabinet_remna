@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getTelegramLaunchData } from './telegram-miniapp-client'
+import { getTelegramLaunchData, telegramStarsInvoiceUrl } from './telegram-miniapp-client'
 
 describe('Telegram Mini App launch data', () => {
   it('reads init data from Telegram URL hash', () => {
@@ -60,5 +60,15 @@ describe('Telegram Mini App launch data', () => {
     })
 
     expect(result).toEqual({ isTelegram: false, initData: '' })
+  })
+})
+
+describe('Telegram Stars invoice link', () => {
+  it.each(['https://t.me/$invoice-slug_1=', 'https://t.me/invoice/invoice-slug_1='])('allows %s', url => {
+    expect(telegramStarsInvoiceUrl(url)).toBe(url)
+  })
+
+  it.each(['http://t.me/$invoice', 'https://t.me.example/$invoice', 'https://t.me/bot?start=invoice'])('rejects %s', url => {
+    expect(telegramStarsInvoiceUrl(url)).toBeNull()
   })
 })

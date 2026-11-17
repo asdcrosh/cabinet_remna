@@ -9,7 +9,7 @@ import { KeysCard } from '@/components/dashboard/keys-card'
 import { SupportPanelDynamic } from '@/components/support/support-panel-dynamic'
 import type { SupportTicket } from '@/components/support/support-panel-model'
 import type { BonusBoxMissionView, BonusBoxOverview, OpenBoxResponse } from '@/components/bonus-box/bonus-box-types'
-import { getTelegramLaunchData } from '@/lib/telegram-miniapp-client'
+import { getTelegramLaunchData, loadTelegramMiniAppSdk, telegramStarsInvoiceUrl } from '@/lib/telegram-miniapp-client'
 import { miniAppDestination } from '@/lib/miniapp/destination'
 import { miniAppDemo, type MiniAppOverview, type TelegramRubleMethod } from '@/lib/miniapp/model'
 import { AUTO_RENEWAL_CONSENT_VERSION } from '@/lib/auto-renewal-consent'
@@ -56,6 +56,8 @@ export function MiniApp({ demo = false, brandName = 'VPN Cabinet', bannerUrl }: 
   const [copied, setCopied] = useState(false)
   const [selectedLimits, setSelectedLimits] = useState<Record<string, number>>({})
   const [promoCodes, setPromoCodes] = useState<Record<string, string>>({})
+  const [verifiedTelegramLaunch, setVerifiedTelegramLaunch] = useState(false)
+  const [starsInvoice, setStarsInvoice] = useState<{ planId: string; url: string } | null>(null)
   const [checkoutPlanId, setCheckoutPlanId] = useState<string | null>(null)
   const [botCheckoutGrant, setBotCheckoutGrant] = useState<string | null>(null)
   const [autoRenewal, setAutoRenewal] = useState<AutoRenewalState>(null)
@@ -76,15 +78,8 @@ export function MiniApp({ demo = false, brandName = 'VPN Cabinet', bannerUrl }: 
     async function boot() {
       try {
         let launch = getTelegramLaunchData(window.location, window.Telegram?.WebApp?.initData)
-        if (!launch.isTelegram && window.location.href.includes('tgWebAppVersion=')) {
-          await new Promise<void>(resolve => {
-            const onReady = () => { clearTimeout(timeout); resolve() }
-            const timeout = window.setTimeout(() => {
-              window.removeEventListener('telegram-web-app-ready', onReady)
-              resolve()
-            }, 4000)
-            window.addEventListener('telegram-web-app-ready', onReady, { once: true })
-          })
+        if (launch.isTelegram || window.location.href.includes('tgWebAppVersion=')) {
+          await loadTelegramMiniAppSdk()
           launch = getTelegramLaunchData(window.location, window.Telegram?.WebApp?.initData)
         }
         if (launch.isTelegram) {
@@ -92,6 +87,7 @@ export function MiniApp({ demo = false, brandName = 'VPN Cabinet', bannerUrl }: 
           const start = launchParams.get('start_param')?.match(/^ref_([A-Z0-9]{6,8})$/)?.[1]
           const referralCode = start || new URLSearchParams(window.location.search).get('ref')
           await request('/api/miniapp/auth', { initData: launch.initData, referralCode })
+          if (!cancelled) setVerifiedTelegramLaunch(true)
           // Never keep signed launch credentials in the URL/history after exchange.
           const clean = new URL(window.location.href)
           for (const key of Array.from(clean.searchParams.keys())) if (key.startsWith('tgWebApp') || key === 'ref') clean.searchParams.delete(key)
@@ -199,9 +195,8 @@ export function MiniApp({ demo = false, brandName = 'VPN Cabinet', bannerUrl }: 
   }
   async function buyPlan(plan: MiniAppOverview['plans'][number]) {
     if (demo) { setNotice('Это демонстрация. Счёт не создаётся.'); return }
-    const webApp = window.Telegram?.WebApp
-    if (!webApp?.openInvoice) { setError('Откройте приложение внутри Telegram для оплаты Stars.'); return }
-    setBusy(true); setError(''); setNotice('')
+    if (!verifiedTelegramLaunch && !window.Telegram?.WebApp?.initData) { setError('Откройте приложение внутри Telegram для оплаты Stars.'); return }
+    setBusy(true); setError(''); setNotice(''); setStarsInvoice(null)
     try {
       const result = await request<{ confirmationUrl?: string; starsAmount?: number; redirectUrl?: string }>('/api/miniapp/checkout', {
         planId: plan.id, purchaseType: 'SUBSCRIPTION', provider: 'TELEGRAM_STARS',
@@ -209,11 +204,21 @@ export function MiniApp({ demo = false, brandName = 'VPN Cabinet', bannerUrl }: 
         ...(promoCodes[plan.id]?.trim() ? { promoCode: promoCodes[plan.id]!.trim() } : {}),
       })
       if (result.redirectUrl) { setNotice('Ознакомительный доступ оформлен. Обновите подписку.'); await refresh(); return }
-      if (!result.confirmationUrl) throw new Error('Ссылка на счёт не получена')
-      webApp.openInvoice(result.confirmationUrl, status => {
-        if (status === 'paid') { setNotice('Оплата подтверждена. Подписка обновится после выдачи.'); void refresh() }
-        else if (status === 'failed') setError('Оплата не завершилась. Попробуйте ещё раз.')
-      })
+      const invoiceUrl = result.confirmationUrl && telegramStarsInvoiceUrl(result.confirmationUrl)
+      if (!invoiceUrl) throw new Error('Ссылка на счёт не получена')
+      const webApp = window.Telegram?.WebApp
+      if (webApp?.openInvoice && webApp.isVersionAtLeast?.('6.1') !== false) {
+        try {
+          webApp.openInvoice(invoiceUrl, status => {
+            if (status === 'paid') { setNotice('Оплата подтверждена. Подписка обновится после выдачи.'); void refresh() }
+            else if (status === 'failed') setError('Оплата не завершилась. Попробуйте ещё раз.')
+          })
+          return
+        } catch {
+          // Some Telegram clients do not provide the invoice window.
+        }
+      }
+      setStarsInvoice({ planId: plan.id, url: invoiceUrl })
     } catch (e) { setError(e instanceof Error ? e.message : 'Не удалось создать счёт') }
     finally { setBusy(false) }
   }
@@ -380,7 +385,9 @@ export function MiniApp({ demo = false, brandName = 'VPN Cabinet', bannerUrl }: 
               <div className={styles.planPrice}>{plan.isPromo ? 'Бесплатно' : `${Math.ceil((plan.priceKopecks + Math.max(0, (selectedLimits[plan.id] ?? plan.initialDevices) - plan.devices) * plan.extraDevicePriceKopecks) / data.starsRateKopecks)} Stars`}</div>
               {!plan.isPromo && <input className={styles.linkInput} aria-label={`Промокод для ${plan.name}`} placeholder="Промокод, если есть" value={promoCodes[plan.id] ?? ''} onChange={e => setPromoCodes(previous => ({ ...previous, [plan.id]: e.target.value }))} />}
               <p>Курс: 1 Star = {(data.starsRateKopecks / 100).toLocaleString('ru-RU')} ₽. Это цена до скидки. Итоговая сумма появится в счёте; подписка продлится по правилам кабинета.</p>
-              <button className={styles.primary} disabled={busy} onClick={() => void buyPlan(plan)}>{plan.isPromo ? 'Получить доступ' : 'Оплатить Stars'}<ArrowUpRight size={18} /></button>
+              {starsInvoice?.planId === plan.id
+                ? <a className={styles.primary} href={starsInvoice.url} target="_blank" rel="noopener noreferrer">Открыть счёт Stars в Telegram<ArrowUpRight size={18} /></a>
+                : <button className={styles.primary} disabled={busy} onClick={() => void buyPlan(plan)}>{plan.isPromo ? 'Получить доступ' : 'Оплатить Stars'}<ArrowUpRight size={18} /></button>}
             </div>}
             </article>)}
         </section>}
