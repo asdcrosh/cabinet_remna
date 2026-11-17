@@ -257,9 +257,14 @@ export function isAdminSectionLinkActive(section: AdminSectionV2, pathname: stri
 
 /** Плоский список адресов админки для поиска ⌘K. */
 export function getAdminCommandItems(sections: AdminSectionV2[]) {
-  return sections.flatMap((section) => {
+  const items = sections.flatMap((section) => {
     const links: Array<{ href: string; label: string; group: string; keywords?: string[] }> = []
-    const tabs = section.tabs?.length ? section.tabs : [{ href: section.href, label: section.label }]
+    // У раздела с подразделами («Продажи») своей страницы нет: его адрес совпадает с первым подразделом.
+    const tabs = section.tabs?.length
+      ? section.tabs
+      : section.children?.length
+        ? []
+        : [{ href: section.href, label: section.label }]
     for (const tab of tabs) {
       links.push({
         href: tab.href,
@@ -278,6 +283,13 @@ export function getAdminCommandItems(sections: AdminSectionV2[]) {
       }
     }
     return links
+  })
+  // Один адрес — одна строка поиска: иначе дубли в списке и одинаковые ключи в React.
+  const seen = new Set<string>()
+  return items.filter((item) => {
+    if (seen.has(item.href)) return false
+    seen.add(item.href)
+    return true
   })
 }
 

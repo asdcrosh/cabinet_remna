@@ -75,6 +75,13 @@ describe('admin navigation v2', () => {
     }
   })
 
+  it('lists every address in the admin search only once', () => {
+    const items = getAdminCommandItems(getAdminSectionsV2('SUPER_ADMIN', allFeatures))
+    const hrefs = items.map((item) => item.href)
+    expect(new Set(hrefs).size).toBe(hrefs.length)
+    expect(items.find((item) => item.href === '/dashboard/admin/plans')?.label).toBe('Продажи · Тарифы')
+  })
+
   it('does not widen access: admins still do not see nodes, watch and audit', () => {
     const sections = getAdminSectionsV2('ADMIN', allFeatures)
     const reachable = getAdminCommandItems(sections).map((item) => item.href)
