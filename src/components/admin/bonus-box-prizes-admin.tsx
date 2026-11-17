@@ -694,7 +694,7 @@ function PrizeEditorDrawer({
         aria-labelledby={titleId}
         aria-describedby={descriptionId}
         tabIndex={-1}
-        className="absolute bottom-0 right-0 h-[calc(100dvh-0.75rem)] w-full max-w-xl overflow-y-auto rounded-t-3xl border border-b-0 border-slate-200 bg-white shadow-2xl dark:border-white/10 dark:bg-surface-950 sm:bottom-auto sm:top-0 sm:h-dvh sm:rounded-none sm:border-y-0 sm:border-r-0"
+        className="absolute bottom-0 right-0 h-[calc(100dvh-var(--app-safe-top)-0.75rem)] w-full max-w-xl overflow-y-auto rounded-t-3xl border border-b-0 border-slate-200 bg-white shadow-2xl dark:border-white/10 dark:bg-surface-950 sm:bottom-auto sm:top-0 sm:h-dvh sm:rounded-none sm:border-y-0 sm:border-r-0"
       >
         <div className="sticky top-0 z-10 border-b border-slate-100 bg-white/95 p-5 backdrop-blur dark:border-white/10 dark:bg-surface-950/95 sm:p-6">
           <div className="flex items-start justify-between gap-3">
@@ -712,7 +712,7 @@ function PrizeEditorDrawer({
           </div>
         </div>
 
-        <div className="grid gap-4 p-5 sm:p-6">
+        <div className="grid gap-4 p-5 pb-[max(1.25rem,calc(var(--app-safe-bottom)+0.75rem))] sm:p-6">
           <Field label="Название">
             <input
               value={form.title}

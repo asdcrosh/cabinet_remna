@@ -64,9 +64,9 @@ export function Toaster() {
       aria-label="Системные уведомления"
       className={cn(
         'fixed inset-x-3 z-[250] flex flex-col items-center gap-2 sm:inset-x-auto sm:bottom-4 sm:right-4 sm:w-96 sm:items-stretch',
-        pathname.startsWith('/dashboard')
-          ? 'bottom-[calc(max(env(safe-area-inset-bottom),var(--tg-content-safe-area-inset-bottom,0px),var(--telegram-miniapp-bottom-offset,0px))+5.35rem)]'
-          : 'bottom-[max(1rem,env(safe-area-inset-bottom),var(--tg-content-safe-area-inset-bottom,0px),var(--telegram-miniapp-bottom-offset,0px))]'
+        pathname.startsWith('/dashboard') || pathname.startsWith('/miniapp')
+          ? 'bottom-[calc(var(--app-mobile-nav-space)+0.35rem)]'
+          : 'bottom-[max(1rem,var(--app-safe-bottom))]'
       )}
     >
       {items.map((t) => (

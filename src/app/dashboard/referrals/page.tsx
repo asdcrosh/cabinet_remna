@@ -16,9 +16,10 @@ import {
 import { ReferralLinkCard } from '@/components/dashboard/referral-card'
 import { PageHeader } from '@/components/dashboard/page-header'
 import { CountUp } from '@/components/dashboard/count-up'
-import { isFeatureEnabled } from '@/lib/feature-flags'
+import { getFeatureFlags } from '@/lib/feature-flags'
 import { channelCampaign } from '@/lib/miniapp/channel-referrals'
 import { prisma } from '@/lib/prisma'
+import { BonusSectionTabs } from '@/components/dashboard/bonus-section-tabs'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Пригласить друга' }
@@ -28,9 +29,10 @@ export default async function ReferralsPage({
 }: {
   searchParams: Promise<{ page?: string }>
 }) {
-  if (!await isFeatureEnabled('referrals')) notFound()
+  const features = await getFeatureFlags()
+  if (!features.referrals) notFound()
   const session = await getCurrentUser()
-  if (!session) redirect('/login')
+  if (!session) redirect('/login?next=/dashboard/referrals')
   const params = await searchParams
   const requestedPage = Number(params.page)
   const page = Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1
@@ -56,7 +58,7 @@ export default async function ReferralsPage({
   if (page > pages) redirect(page === 1 ? '/dashboard/referrals' : `/dashboard/referrals?page=${pages}`)
 
   return (
-    <div className="page-stack">
+    <div className="page-stack" data-design={features.newDesign ? 'v2' : undefined}>
       {channel && channelBot && channelStats && (
         <section className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 dark:border-emerald-500/20 dark:bg-emerald-500/10">
           <h2 className="text-lg font-semibold">Пригласить в Telegram-канал</h2>
@@ -66,9 +68,10 @@ export default async function ReferralsPage({
         </section>
       )}
       <PageHeader
-        title="Пригласить друга"
+        title={features.newDesign && features.bonusBox ? 'Бонусы' : 'Пригласить друга'}
         description={`Поделитесь ссылкой. ${referralConditionText(settings)}`}
       />
+      {features.newDesign && features.bonusBox ? <BonusSectionTabs active="invite" /> : null}
 
       <section id="referral-link" className="min-w-0 scroll-mt-24">
         <ReferralLinkCard code={referralCode} url={referralUrl} settings={settings} />

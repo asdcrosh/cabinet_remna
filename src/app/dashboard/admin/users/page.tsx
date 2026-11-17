@@ -22,6 +22,7 @@ import { UserWhitelistAddonButton } from '@/components/admin/user-whitelist-addo
 import { BulkUserSyncButton } from '@/components/admin/bulk-user-sync-button'
 import { buildAdminUserSearchFilters } from '@/lib/admin-user-search'
 import { appendReturnTo, sanitizeAdminSupportReturnPath } from '@/components/support/support-panel-model'
+import { getFeatureFlags } from '@/lib/feature-flags'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Пользователи — Админка' }
@@ -125,6 +126,7 @@ export default async function AdminUsersPage({
       })
     : []
   const attemptsByUser = new Map(attemptsRows.map((row) => [row.userId, row._count._all]))
+  const features = await getFeatureFlags()
 
   return (
     <AdminPageShell
@@ -216,7 +218,11 @@ export default async function AdminUsersPage({
                       className={`h-2 w-2 shrink-0 rounded-full ${user.lastLoginAt ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-600'}`}
                       title={user.lastLoginAt ? 'Пользователь входил в кабинет' : 'Входов не было'}
                     />
-                    <div className="min-w-0 break-words text-sm font-semibold sm:text-base">{user.email}</div>
+                    {features.newDesign ? (
+                      <Link href={`/dashboard/admin/users/${user.id}`} className="min-w-0 break-words text-sm font-semibold hover:underline sm:text-base">{user.email}</Link>
+                    ) : (
+                      <div className="min-w-0 break-words text-sm font-semibold sm:text-base">{user.email}</div>
+                    )}
                   </div>
                   <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
                     <span>{user.name || 'Без имени'}</span>

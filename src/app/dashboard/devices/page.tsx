@@ -1,9 +1,28 @@
 import { DevicesList } from '@/components/dashboard/devices-list'
 import { PageHeader } from '@/components/dashboard/page-header'
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import { KeyRound, MonitorSmartphone } from 'lucide-react'
+import { getFeatureFlags } from '@/lib/feature-flags'
+import { getCurrentUser } from '@/lib/auth/cookies'
+import { prisma } from '@/lib/prisma'
 
-export default function DevicesPage() {
+export const dynamic = 'force-dynamic'
+
+export default async function DevicesPage() {
+  // В новом дизайне устройства живут в разделе «VPN». Старые ссылки из уведомлений ведут туда же.
+  if ((await getFeatureFlags()).newDesign) redirect('/dashboard/subscription#devices')
+  const session = await getCurrentUser()
+  if (!session) redirect('/login?next=/dashboard/devices')
+  const subscription = await prisma.subscription.findFirst({
+    where: { userId: session.uid },
+    orderBy: { expireAt: 'desc' },
+    select: { deviceLimit: true, plan: { select: { deviceLimit: true, unlimitedDevices: true } } },
+  })
+  // Без лимита список не мог предупредить о превышении: передаём его так же, как раздел «Подключение».
+  const deviceLimit = subscription?.plan?.unlimitedDevices
+    ? null
+    : subscription?.deviceLimit ?? subscription?.plan?.deviceLimit ?? null
   return (
     <div className="page-stack">
       <PageHeader
@@ -43,7 +62,7 @@ export default function DevicesPage() {
         </div>
         <Link href="/dashboard/subscription" className="btn-secondary mt-3 w-full justify-center sm:w-auto">Управлять ссылкой</Link>
       </details>
-      <DevicesList />
+      <DevicesList deviceLimit={deviceLimit} />
     </div>
   )
 }

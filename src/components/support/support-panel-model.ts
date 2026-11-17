@@ -120,6 +120,8 @@ export interface SupportPanelProps {
   initialCategory?: SupportCategoryValue
   initialMessage?: string
   initialNewTicketOpen?: boolean
+  /** Заголовок для клиента: «Поддержка» в старом дизайне, «Помощь» в новом. */
+  userTitle?: string
 }
 
 export function buildAdminSupportPath(input: {

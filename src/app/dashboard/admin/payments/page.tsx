@@ -16,6 +16,7 @@ import type { PaymentProvider, PaymentStatus } from '@prisma/client'
 import { PaymentLiveSync } from '@/components/admin/payment-live-sync'
 import { PaymentTimelineButton } from '@/components/admin/payment-timeline-button'
 import { appendReturnTo, sanitizeAdminSupportReturnPath } from '@/components/support/support-panel-model'
+import { buildAdminPaymentSearchFilters } from '@/lib/admin-search'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Платежи — Админка' }
@@ -33,7 +34,8 @@ export default async function AdminPaymentsPage({
   const status = parseEnum(params.status, ['PENDING', 'SUCCEEDED', 'CANCELED', 'REFUNDED'] as const)
   const provider = parseEnum(params.provider, ['YOOKASSA', 'PAYANYWAY', 'PLATEGA', 'TELEGRAM_STARS', 'LOCAL'] as const)
   const delivery = parseEnum(params.delivery, ['DELIVERED', 'RETRY'] as const)
-  const range = parseEnum(params.range, ['TODAY', '7D', '30D', 'CUSTOM'] as const)
+  // WEEK — значение из фильтра «Неделя»; 7D/30D оставлены для старых ссылок.
+  const range = parseEnum(params.range, ['TODAY', 'WEEK', '7D', '30D', 'CUSTOM'] as const)
   const { from, to } = resolveDateRange(range, params.from, params.to)
   const limit = parseAdminListLimit(params.limit)
   const where = {
@@ -47,14 +49,7 @@ export default async function AdminPaymentsPage({
     ...(from || to ? { createdAt: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } } : {}),
     ...(q
       ? {
-          OR: [
-            { id: { equals: q } },
-            { user: { email: { contains: q, mode: 'insensitive' as const } } },
-            { user: { name: { contains: q, mode: 'insensitive' as const } } },
-            { plan: { name: { contains: q, mode: 'insensitive' as const } } },
-            { yookassaId: { contains: q, mode: 'insensitive' as const } },
-            { externalPaymentId: { contains: q, mode: 'insensitive' as const } },
-          ],
+          OR: buildAdminPaymentSearchFilters(q),
         }
       : {}),
   }
@@ -313,9 +308,9 @@ function resolveDateRange(range: string, fromRaw?: string, toRaw?: string) {
     end.setHours(23, 59, 59, 999)
     return { from: start, to: end }
   }
-  if (range === 'WEEK') {
+  if (range === 'WEEK' || range === '7D' || range === '30D') {
     const start = new Date(now)
-    start.setDate(start.getDate() - 7)
+    start.setDate(start.getDate() - (range === '30D' ? 30 : 7))
     start.setHours(0, 0, 0, 0)
     return { from: start, to: now }
   }

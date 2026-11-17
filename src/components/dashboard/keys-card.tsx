@@ -11,8 +11,10 @@ import {
   Download,
   ExternalLink,
   HelpCircle,
+  Link2,
   QrCode,
   Rabbit,
+  RefreshCw,
   ShieldCheck,
   Smartphone,
 } from 'lucide-react'
@@ -32,6 +34,8 @@ interface KeysCardProps {
   happLink?: string | null
   supportEnabled?: boolean
   deviceLimit?: number | null
+  /** Новый дизайн: ссылка, QR и смена ссылки — открытым блоком, а не внутри «Не получается?». */
+  linkTools?: boolean
 }
 
 interface AppOption {
@@ -103,6 +107,7 @@ export function KeysCard({
   happLink,
   supportEnabled = false,
   deviceLimit,
+  linkTools = false,
 }: KeysCardProps) {
   const [step, setStep] = useState<1 | 2 | 3>(1)
   const [installOpened, setInstallOpened] = useState(false)
@@ -315,22 +320,55 @@ export function KeysCard({
               <button type="button" className="btn-secondary justify-center" onClick={() => setInstructionsOpen(true)}>
                 <HelpCircle className="h-4 w-4" /> Инструкция для {selectedApp.name}
               </button>
-              <button type="button" className="btn-secondary justify-center" onClick={() => copy(subscriptionUrl, 'Ссылка подписки')} disabled={!subscriptionUrl}>
-                <Copy className="h-4 w-4" /> {copied ? 'Ссылка скопирована' : 'Скопировать ссылку'}
-              </button>
-              <button type="button" className="btn-secondary justify-center" onClick={() => setQrOpen(true)} disabled={!subscriptionUrl}>
-                <QrCode className="h-4 w-4" /> QR-код для приложения
-              </button>
+              {linkTools ? null : (
+                <>
+                  <button type="button" className="btn-secondary justify-center" onClick={() => copy(subscriptionUrl, 'Ссылка подписки')} disabled={!subscriptionUrl}>
+                    <Copy className="h-4 w-4" /> {copied ? 'Ссылка скопирована' : 'Скопировать ссылку'}
+                  </button>
+                  <button type="button" className="btn-secondary justify-center" onClick={() => setQrOpen(true)} disabled={!subscriptionUrl}>
+                    <QrCode className="h-4 w-4" /> QR-код для приложения
+                  </button>
+                </>
+              )}
             </div>
-            <p className="text-xs leading-5 text-slate-500">Ссылка даёт доступ к вашему VPN. Не отправляйте её другим людям.</p>
+            {linkTools ? null : <p className="text-xs leading-5 text-slate-500">Ссылка даёт доступ к вашему VPN. Не отправляйте её другим людям.</p>}
             {step === 2 ? <button type="button" className="btn-secondary w-full" onClick={() => setStep(3)}>Подписка добавлена вручную</button> : null}
-            <button type="button" onClick={() => setConfirmOpen(true)} disabled={revoking} className="min-h-11 text-xs text-slate-500 hover:underline">
-              {revoking ? 'Обновляем…' : 'Сменить ссылку доступа'}
-            </button>
+            {linkTools ? null : (
+              <button type="button" onClick={() => setConfirmOpen(true)} disabled={revoking} className="min-h-11 text-xs text-slate-500 hover:underline">
+                {revoking ? 'Обновляем…' : 'Сменить ссылку доступа'}
+              </button>
+            )}
             {supportEnabled && <Link href="/dashboard/support" className="block py-2 text-sm font-medium underline">Написать в поддержку</Link>}
           </div>
         </details>
       </div>
+
+      {linkTools ? (
+        <div id="connection-link" className="border-t border-slate-200 p-5 dark:border-white/10 sm:p-7">
+          <div className="flex items-start gap-3">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-700 dark:bg-white/[0.06] dark:text-slate-200">
+              <Link2 className="h-5 w-5" />
+            </span>
+            <div className="min-w-0">
+              <h2 className="text-base font-semibold text-slate-950 dark:text-white">Ссылка подключения</h2>
+              <p className="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">
+                Для ручного добавления в приложение. Ссылка даёт доступ к вашему VPN — не отправляйте её другим людям.
+              </p>
+            </div>
+          </div>
+          <div className="mt-4 grid gap-2 sm:grid-cols-3">
+            <button type="button" className="btn-secondary justify-center" onClick={() => copy(subscriptionUrl, 'Ссылка подключения')} disabled={!subscriptionUrl}>
+              <Copy className="h-4 w-4" /> {copied ? 'Скопировано' : 'Скопировать'}
+            </button>
+            <button type="button" className="btn-secondary justify-center" onClick={() => setQrOpen(true)} disabled={!subscriptionUrl}>
+              <QrCode className="h-4 w-4" /> QR-код
+            </button>
+            <button type="button" className="btn-secondary justify-center" onClick={() => setConfirmOpen(true)} disabled={revoking}>
+              <RefreshCw className={cn('h-4 w-4', revoking && 'animate-spin')} /> {revoking ? 'Меняем…' : 'Сменить ссылку'}
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       <InstructionModal
         open={instructionsOpen}
@@ -344,7 +382,7 @@ export function KeysCard({
 
       <ConfirmDialog
         open={confirmOpen}
-        title="Обновить ссылку подписки?"
+        title={linkTools ? 'Сменить ссылку подключения?' : 'Обновить ссылку подписки?'}
         description="Старая ссылка перестанет работать. На подключённых устройствах потребуется добавить новую."
         confirmLabel="Обновить"
         loading={revoking}

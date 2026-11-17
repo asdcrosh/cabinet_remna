@@ -133,8 +133,8 @@ export function Modal({
         className={cn(
           'app-modal-panel flex w-full flex-col overflow-hidden bg-white shadow-[0_32px_90px_rgba(15,23,42,.24)] dark:bg-surface-900',
           variant === 'sheet'
-            ? 'h-auto max-h-[90dvh] rounded-t-[22px] border border-b-0 border-slate-200 dark:border-white/10 sm:max-h-[calc(100dvh-40px)] sm:max-w-lg sm:rounded-[16px] sm:border'
-            : 'h-auto max-h-[92dvh] rounded-t-[22px] border border-b-0 border-slate-200 dark:border-white/10 sm:max-h-[calc(100dvh-40px)] sm:max-w-lg sm:rounded-[16px] sm:border',
+            ? 'h-auto max-h-[min(90dvh,calc(100dvh-var(--app-safe-top)-0.75rem))] rounded-t-[22px] border border-b-0 border-slate-200 dark:border-white/10 sm:max-h-[calc(100dvh-40px)] sm:max-w-lg sm:rounded-[16px] sm:border'
+            : 'h-auto max-h-[min(92dvh,calc(100dvh-var(--app-safe-top)-0.75rem))] rounded-t-[22px] border border-b-0 border-slate-200 dark:border-white/10 sm:max-h-[calc(100dvh-40px)] sm:max-w-lg sm:rounded-[16px] sm:border',
           panelClassName,
         )}
       >
@@ -153,10 +153,17 @@ export function Modal({
             <X className="h-5 w-5" />
           </Button>
         </div>
-        <div className={cn('min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4', bodyClassName)}>
+        <div
+          className={cn(
+            'min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4',
+            // Без футера нижний отступ шторки держит контент над Home-индикатором.
+            !footer && 'pb-[max(1rem,calc(var(--app-safe-bottom)+0.5rem))] sm:pb-4',
+            bodyClassName,
+          )}
+        >
           {children}
         </div>
-        {footer ? <div className="app-modal-footer shrink-0 border-t border-slate-200 px-5 py-4 dark:border-white/10">{footer}</div> : null}
+        {footer ? <div className="app-modal-footer shrink-0 border-t border-slate-200 px-5 py-4 pb-[max(1rem,calc(var(--app-safe-bottom)+0.5rem))] dark:border-white/10 sm:pb-4">{footer}</div> : null}
       </div>
     </div>,
     document.body

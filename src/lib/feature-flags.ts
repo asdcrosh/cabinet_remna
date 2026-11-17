@@ -5,6 +5,8 @@ export type FeatureFlags = {
   bonusBox: boolean
   support: boolean
   broadcasts: boolean
+  /** Новая навигация кабинета и админки. Выключение возвращает прежний дизайн всем. */
+  newDesign: boolean
 }
 
 export async function getFeatureFlags(): Promise<FeatureFlags> {
@@ -15,6 +17,7 @@ export async function getFeatureFlags(): Promise<FeatureFlags> {
       bonusBox: true,
       support: true,
       broadcasts: true,
+      newDesign: true,
     },
   })
 
@@ -35,6 +38,7 @@ export async function updateFeatureFlags(flags: FeatureFlags) {
       bonusBox: true,
       support: true,
       broadcasts: true,
+      newDesign: true,
     },
   })
 }
@@ -45,6 +49,7 @@ function getEnvironmentFeatureFlags(): FeatureFlags {
     bonusBox: envFlag('BONUS_BOX_ENABLED', true),
     support: envFlag('FEATURE_SUPPORT', true),
     broadcasts: envFlag('FEATURE_BROADCASTS', true),
+    newDesign: envFlag('FEATURE_NEW_DESIGN', true),
   }
 }
 

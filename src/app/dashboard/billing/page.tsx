@@ -9,7 +9,7 @@ import { PaymentSuccessBanner } from '@/components/dashboard/payment-success-ban
 import { PaymentHistory } from '@/components/dashboard/payment-history'
 import { readPaymentBannerStatus } from '@/lib/payment-status-read'
 import { getFeatureFlags } from '@/lib/feature-flags'
-import { CreditCard } from 'lucide-react'
+import { ArrowRight, CreditCard, Tag } from 'lucide-react'
 import { AutoRenewalCard } from '@/components/dashboard/auto-renewal-card'
 import { getAutoRenewalState } from '@/lib/auto-renewal'
 import { getRetentionState } from '@/lib/subscription-retention'
@@ -18,6 +18,12 @@ import type { Prisma } from '@prisma/client'
 import { resolveSubscriptionPresentation } from '@/lib/subscription-presentation'
 import { BillingOverview } from '@/components/dashboard/billing-overview'
 import { isWhitelistAddonCurrentlyActive } from '@/lib/whitelist-addon-policy'
+import { buildDeviceAddonOffer, buildWhitelistAddonOffer } from '@/lib/subscription-addon-offers'
+import { getAvailablePaymentProviders } from '@/lib/payment-providers'
+import { getAvailableUserPromoCodesByPlan, type AvailableUserPromoCode } from '@/lib/user-promo-codes'
+import { HomeWhitelistAddon } from '@/components/dashboard/home-whitelist-addon'
+import { HomeDeviceAddon } from '@/components/dashboard/home-device-addon'
+import { formatPrice } from '@/lib/format'
 
 export const dynamic = 'force-dynamic'
 const PAGE_SIZE = 20
@@ -31,7 +37,7 @@ export default async function BillingPage({
   const params = await searchParams
   const features = await getFeatureFlags()
   const session = await getCurrentUser()
-  if (!session) redirect('/login')
+  if (!session) redirect('/login?next=/dashboard/billing')
   const returnPaymentId = typeof params.payment === 'string' ? params.payment : null
   const requestedPage = Number(params.page)
   const page = Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1
@@ -82,6 +88,8 @@ export default async function BillingPage({
               deviceLimit: true,
               maxDeviceLimit: true,
               extraDevicePriceKopecks: true,
+              deviceAddonEnabled: true,
+              promoCodesEnabled: true,
             },
           },
         },
@@ -120,9 +128,43 @@ export default async function BillingPage({
     && ['ACTIVE', 'LIMITED'].includes(currentSubscription.status)
     && currentSubscription.expireAt > new Date())
 
+  const v2 = features.newDesign
+  // Новый дизайн: без подписки и без платежей раздел сразу открывает выбор тарифа.
+  if (v2 && !currentSubscription && total === 0 && view === 'important' && !returnPaymentId) {
+    redirect('/dashboard/plans')
+  }
+  const [paymentProviders, promoCodesByPlan]: [
+    Awaited<ReturnType<typeof getAvailablePaymentProviders>>,
+    Map<string, AvailableUserPromoCode[]>,
+  ] = v2 && currentSubscription && plan
+    ? await Promise.all([
+        getAvailablePaymentProviders(),
+        getAvailableUserPromoCodesByPlan({ userId: session.uid, plans: [plan] })
+          .catch(() => new Map<string, AvailableUserPromoCode[]>()),
+      ])
+    : [[], new Map()]
+  const whitelistAddonOffer = v2 && currentSubscription && subscriptionState
+    ? buildWhitelistAddonOffer({
+        subscriptions: [currentSubscription],
+        usable: subscriptionState.usable,
+        effectiveExpireAt: subscriptionState.expireAt,
+      })
+    : null
+  const deviceAddonOffer = v2 && currentSubscription && subscriptionState
+    ? buildDeviceAddonOffer({
+        subscription: currentSubscription,
+        usable: subscriptionState.usable,
+        expireAt: subscriptionState.expireAt ?? currentSubscription.expireAt,
+      })
+    : null
+  const promoCodes = plan ? promoCodesByPlan.get(plan.id) ?? [] : []
+
   return (
-    <div className="user-workspace page-stack mx-auto max-w-6xl">
-      <PageHeader title="Подписка и оплата" description="Срок доступа, продление и все ваши платежи." />
+    <div className="user-workspace page-stack mx-auto max-w-6xl" data-design={v2 ? 'v2' : undefined}>
+      <PageHeader
+        title={v2 ? 'Подписка' : 'Подписка и оплата'}
+        description={v2 ? 'Тариф и срок, продление, дополнения и платежи.' : 'Срок доступа, продление и все ваши платежи.'}
+      />
 
       {params.paid === '1' && returnPaymentId && (
         <PaymentSuccessBanner
@@ -151,6 +193,41 @@ export default async function BillingPage({
           <Link href="/dashboard/plans" className="btn-primary mt-4 w-full sm:w-auto"><CreditCard className="h-4 w-4" />Выбрать тариф</Link>
         </section>
       )}
+
+      {whitelistAddonOffer || deviceAddonOffer ? (
+        <section aria-labelledby="addons-title" className="space-y-3">
+          <h2 id="addons-title" className="px-1 text-lg font-semibold tracking-tight text-slate-950 dark:text-white">Дополнения</h2>
+          {whitelistAddonOffer ? <HomeWhitelistAddon {...whitelistAddonOffer} paymentProviders={paymentProviders} /> : null}
+          {deviceAddonOffer ? <HomeDeviceAddon {...deviceAddonOffer} paymentProviders={paymentProviders} /> : null}
+        </section>
+      ) : null}
+
+      {v2 && plan && promoCodes.length > 0 ? (
+        <section aria-labelledby="promo-codes-title" className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4 dark:border-amber-400/20 dark:bg-amber-400/[0.06] sm:p-5">
+          <h2 id="promo-codes-title" className="flex items-center gap-2 text-base font-semibold text-slate-950 dark:text-white">
+            <Tag className="h-4 w-4 text-amber-600 dark:text-amber-300" />
+            {promoCodes.length === 1 ? 'У вас есть промокод' : 'Ваши промокоды'}
+          </h2>
+          <ul className="mt-3 space-y-2">
+            {promoCodes.map((promo) => (
+              <li key={promo.code} className="flex flex-col gap-2 rounded-xl bg-white px-3.5 py-3 dark:bg-white/[0.04] sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <div className="font-mono text-sm font-semibold text-slate-950 dark:text-white">{promo.code}</div>
+                  <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                    −{promo.discountPercent}% на продление «{plan.name}» · {formatPrice(promo.finalAmountKopecks)} вместо {formatPrice(promo.finalAmountKopecks + promo.discountKopecks)}
+                  </div>
+                </div>
+                <Link
+                  href={`/dashboard/plans?plan=${encodeURIComponent(plan.id)}&promo=${encodeURIComponent(promo.code)}&intent=renew`}
+                  className="btn-primary w-full shrink-0 justify-center sm:w-auto"
+                >
+                  Применить <ArrowRight className="h-4 w-4" />
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       {renewalPlan && (!renewalPlan.unlimitedDuration || autoRenewal || retentionPause) ? (
         <AutoRenewalCard

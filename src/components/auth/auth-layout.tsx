@@ -53,7 +53,7 @@ export function AuthLayout({
         </div>
       </aside>
 
-      <main className="flex min-h-dvh items-start justify-center px-4 pb-[max(1.5rem,env(safe-area-inset-bottom),var(--tg-content-safe-area-inset-bottom,0px),var(--telegram-miniapp-bottom-offset,0px))] pt-[max(1rem,env(safe-area-inset-top),calc(var(--tg-content-safe-area-inset-top,0px)+var(--telegram-miniapp-top-offset,0px)))] sm:px-8 sm:py-10 min-[1200px]:items-center min-[1200px]:px-10 xl:px-16">
+      <main className="flex min-h-dvh items-start justify-center px-4 pb-[max(1.5rem,calc(var(--app-safe-bottom)+0.75rem))] pt-[max(1rem,calc(var(--app-safe-top)+0.75rem))] sm:px-8 sm:py-10 min-[1200px]:items-center min-[1200px]:px-10 xl:px-16">
         <div className="w-full max-w-[32rem]">
           <nav aria-label="Основная навигация" className="mb-5 flex items-center justify-between gap-3 min-[1200px]:hidden">
             <Link href="/" className="flex min-w-0 items-center gap-3">

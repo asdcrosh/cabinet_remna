@@ -25,7 +25,7 @@ export const dynamic = 'force-dynamic'
 export default async function SubscriptionPage() {
   const features = await getFeatureFlags()
   const session = await getCurrentUser()
-  if (!session) redirect('/login')
+  if (!session) redirect('/login?next=/dashboard/subscription')
   const [user, localSubscription, payments, auditEvents] = await Promise.all([
     prisma.user.findUnique({ where: { id: session.uid } }),
     prisma.subscription.findFirst({
@@ -200,6 +200,7 @@ export default async function SubscriptionPage() {
         : localSubscription?.deviceLimit ?? localSubscription?.plan?.deviceLimit}
       expired={subscriptionExpired}
       accessIssue={accessIssue}
+      newDesign={features.newDesign}
       notice={graceActive ? (
         <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-400/10 dark:text-amber-200">
           Льготный период до {localSubscription?.graceExpireAt?.toLocaleDateString('ru-RU')}. <Link href="/dashboard/plans?intent=renew" className="underline">Продлить доступ</Link>
@@ -289,9 +290,13 @@ export default async function SubscriptionPage() {
         </div>
       </section>
 
-      <Link href="/dashboard/billing" className="btn-secondary w-full">Управлять подпиской и оплатой</Link>
+      {features.newDesign ? null : (
+        <>
+          <Link href="/dashboard/billing" className="btn-secondary w-full">Управлять подпиской и оплатой</Link>
 
-      <SubscriptionTimeline payments={payments} auditEvents={auditEvents} />
+          <SubscriptionTimeline payments={payments} auditEvents={auditEvents} />
+        </>
+      )}
     </ConnectionPage>
   )
 }

@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from 'react'
 import Image from 'next/image'
-import { ArrowUpRight, Bell, Check, Copy, CreditCard, Gift, Headphones, Home, LayoutGrid, LoaderCircle, Lock, RefreshCw, Settings as SettingsIcon, Shield, Smartphone, Sparkles, Trophy, Users, Wallet, Wifi, Wrench, X } from 'lucide-react'
+import { ArrowRight, ArrowUpRight, Bell, CalendarDays, Check, Copy, CreditCard, Gift, Headphones, Home, LayoutGrid, LoaderCircle, Lock, MonitorSmartphone, RefreshCw, Settings as SettingsIcon, ShieldCheck, Smartphone, Sparkles, Trophy, Users, Wallet, Wifi, Wrench, X } from 'lucide-react'
 import { BrandLogo } from '@/components/brand-logo'
 import { DevicesList } from '@/components/dashboard/devices-list'
 import { KeysCard } from '@/components/dashboard/keys-card'
@@ -13,6 +13,8 @@ import { getTelegramLaunchData, loadTelegramMiniAppSdk, telegramStarsInvoiceUrl 
 import { miniAppDestination } from '@/lib/miniapp/destination'
 import { miniAppDemo, type MiniAppOverview, type TelegramRubleMethod } from '@/lib/miniapp/model'
 import { AUTO_RENEWAL_CONSENT_VERSION } from '@/lib/auto-renewal-consent'
+import { formatSubscriptionDaysLeft } from '@/lib/subscription-time'
+import { useTelegramBackButton } from '@/components/telegram/telegram-back-button'
 import styles from './mini-app.module.css'
 
 type Tab = 'home' | 'plans' | 'devices' | 'referrals' | 'support' | 'connect' | 'menu' | 'billing' | 'bonus' | 'notifications' | 'settings' | 'admin'
@@ -71,6 +73,9 @@ export function MiniApp({ demo = false, brandName = 'VPN Cabinet', bannerUrl }: 
   const [prefs, setPrefs] = useState<Prefs | null>(null)
   const [me, setMe] = useState<Me | null>(null)
   const [adminStats, setAdminStats] = useState<AdminStats | null>(null)
+  // Цепочка разделов для кнопки «Назад» Telegram: нижнее меню начинает её заново.
+  const [tabHistory, setTabHistory] = useState<Tab[]>([])
+  const backButton = useTelegramBackButton()
 
   useEffect(() => {
     if (demo) return
@@ -102,13 +107,13 @@ export function MiniApp({ demo = false, brandName = 'VPN Cabinet', bannerUrl }: 
           setData(result)
           if (result.botCheckout) setBotCheckoutGrant(grant)
           const initial = params.get('tab')
-          if (knownTabs.includes(initial as Tab)) setTab(initial as Tab)
+          if (knownTabs.includes(initial as Tab)) { setTab(initial as Tab); if (initial !== 'home') setTabHistory(['home']) }
           else if (initial && initial !== 'home') window.location.replace(miniAppDestination(initial))
           // Возврат со страницы ЮKassa: оплата прошла внутри Telegram, подтверждаем здесь же.
           if (params.get('paid') === '1') setNotice('Проверяем оплату. Текущий статус можно посмотреть в разделе «Платежи».')
           const requestedPromo = params.get('promo')?.trim()
           if (requestedPlan && result.plans.some(item => item.id === requestedPlan && !item.isPromo)) {
-            setTab('plans')
+            setTab('plans'); setTabHistory(['home'])
             if (params.get('browserCheckout') !== '1' && (result.botCheckout || result.rublePaymentMethods?.length)) setCheckoutPlanId(requestedPlan)
             // Ссылка из бота с применённым промокодом: предзаполняем поле, чтобы скидка применилась автоматически.
             if (requestedPromo) setPromoCodes(previous => ({ ...previous, [requestedPlan]: requestedPromo }))
@@ -168,6 +173,20 @@ export function MiniApp({ demo = false, brandName = 'VPN Cabinet', bannerUrl }: 
     return () => { cancelled = true }
   }, [tab, Boolean(data), demo]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => {
+    if (!backButton) return
+    if (!checkoutPlanId && tabHistory.length === 0) { backButton.hide(); return }
+    const goBack = () => {
+      if (checkoutPlanId) { setCheckoutPlanId(null); return }
+      setTabHistory(tabHistory.slice(0, -1))
+      openTab(tabHistory.at(-1) ?? 'home')
+    }
+    backButton.onClick(goBack)
+    backButton.show()
+    return () => { backButton.offClick(goBack) }
+  }, [backButton, checkoutPlanId, tabHistory])
+  useEffect(() => () => backButton?.hide(), [backButton])
+
   async function refresh() {
     if (demo) { setNotice('Это демонстрация. Данные вымышлены.'); return }
     setBusy(true); setError('')
@@ -175,7 +194,16 @@ export function MiniApp({ demo = false, brandName = 'VPN Cabinet', bannerUrl }: 
     catch (e) { setError(e instanceof Error ? e.message : 'Не удалось обновить') }
     finally { setBusy(false) }
   }
-  function navigate(next: Tab) { setTab(next); setError(''); setNotice(''); setCopied(false); setSpinResult(null) }
+  function openTab(next: Tab) { setTab(next); setError(''); setNotice(''); setCopied(false); setSpinResult(null) }
+  function navigate(next: Tab) {
+    if (next === tab) return
+    setTabHistory(previous => [...previous, tab])
+    openTab(next)
+  }
+  function navigateRoot(next: Tab) {
+    setTabHistory(next === 'home' ? [] : ['home'])
+    openTab(next)
+  }
   async function claim() {
     setBusy(true); setError('')
     try {
@@ -339,9 +367,10 @@ export function MiniApp({ demo = false, brandName = 'VPN Cabinet', bannerUrl }: 
     ...(data?.admin ? [{ id: 'admin' as Tab, icon: Wrench, title: 'Управление', hint: 'Панель администратора' }] : []),
   ]
   return <main className={styles.app}>
+    <div aria-hidden="true" className="telegram-safe-top-cap" />
     <div className={styles.wrap}>
       <header className={styles.header}><div className={styles.brand}><BrandLogo className={styles.logo} /><span>{brandName}<small>Личный кабинет</small></span></div>
-        <button aria-label="Обновить данные" className={styles.iconButton} onClick={() => void refresh()} disabled={busy}><RefreshCw size={19} /></button></header>
+        <button aria-label="Обновить данные" className={styles.iconButton} onClick={() => void refresh()} disabled={busy}><RefreshCw size={18} /></button></header>
       {demo && <div className={styles.demo}>Предпросмотр · вымышленные данные</div>}
       {error && <div role="alert" className={styles.alert}>{error} {!data && <button onClick={() => window.location.reload()}>Повторить</button>}</div>}
       {notice && <div role="status" className={styles.notice}>{notice}</div>}
@@ -350,21 +379,34 @@ export function MiniApp({ demo = false, brandName = 'VPN Cabinet', bannerUrl }: 
         {data.warning && <div className={styles.alert}>{data.warning}</div>}
         {tab === 'home' && <>
           {bannerUrl && <Image className={styles.banner} src={bannerUrl} alt="" width={1200} height={450} unoptimized referrerPolicy="no-referrer" />}
-          <div className={styles.intro}><span>Кабинет / {data.name}</span><h1>Ваш доступ<br /><em>в одном месте.</em></h1></div>
-          <section className={styles.pass} aria-label="Моя подписка"><div className={styles.passTop}><span className={styles.pill}><span className={sub?.usable ? styles.dot : styles.offDot} />{sub?.title || 'Доступ ещё не подключён'}</span><Shield size={28} /></div>
-            <div className={styles.passBody}><small>ВАШ ДОСТУП</small><h2>{sub?.planName || brandName}</h2><p>{sub ? `До ${date}` : 'Начните с выбора подписки'}</p></div>
-            <div className={styles.passBottom}><div><strong>{sub?.daysLeft == null ? (sub ? '∞' : '0') : Math.max(0, sub.daysLeft)}</strong><span>дней доступа</span></div><div><strong>{data.deviceCount}<i> / {sub?.deviceLimit ?? '∞'}</i></strong><span>устройств в кабинете</span></div></div>
+          <div className={styles.intro}><h1>Привет, {data.name}</h1></div>
+          <section className={`${styles.pass} ${sub && !sub.usable ? styles.passOff : ''}`} aria-label="Моя подписка">
+            <div className={styles.passTop}><span className={styles.eyebrow}>Ваша подписка</span>
+              <span className={styles.pill}><span className={sub?.usable ? styles.dot : styles.offDot} />{sub?.title || 'Доступ ещё не подключён'}</span></div>
+            <div className={styles.passBody}>
+              <h2>{sub?.planName || brandName}</h2>
+              {sub && <><small>{sub.daysLeft == null ? 'Доступ' : 'Осталось'}</small>
+                <strong>{sub.daysLeft == null ? 'Бессрочно' : formatSubscriptionDaysLeft(sub.daysLeft)}</strong></>}
+              <p>{sub ? (sub.expiresAt ? `Оплачено до ${date}` : 'Продление не требуется.') : 'Выберите тариф, чтобы подключить VPN.'}</p>
+            </div>
+            <button className={styles.passAction} onClick={() => navigate(sub?.usable ? 'connect' : 'plans')}>
+              {sub?.usable ? <Wifi size={18} /> : <Wallet size={18} />}<span>{sub?.usable ? 'Подключить VPN' : 'Выбрать тариф'}</span><ArrowRight size={16} /></button>
+            <div className={styles.orbit} aria-hidden="true"><span><span><ShieldCheck /></span></span></div>
           </section>
-          <button className={styles.primary} onClick={() => navigate(sub?.usable ? 'connect' : 'plans')}><Wifi size={20} />{sub?.usable ? 'Подключить VPN' : 'Посмотреть тарифы'}<ArrowUpRight size={20} /></button>
-          <div className={styles.quick}><button onClick={() => navigate('plans')}><Wallet /><b>Тарифы</b><span>Условия из кабинета</span></button><button onClick={() => navigate('devices')}><Smartphone /><b>Устройства</b><span>Всё под контролем</span></button></div>
-          {data.referrals && <button className={styles.invite} onClick={() => navigate('referrals')}><Gift size={27} /><span><b>Хорошим делятся</b><small>Приглашайте друзей и получайте дни VPN</small></span><ArrowUpRight size={20} /></button>}
-          <p className={styles.footnote}>Подписка общая с вашим личным кабинетом.<br />Статус подключения проверяется в VPN-приложении.</p>
+          <div className={styles.metrics}>
+            <button className={styles.metric} onClick={() => navigate('devices')}><MonitorSmartphone />
+              <span>Мои устройства</span><strong>{data.deviceCount}<i> / {sub?.deviceLimit ?? '∞'}</i></strong><small>Посмотреть и управлять</small></button>
+            <button className={styles.metric} onClick={() => navigate('plans')}><CalendarDays />
+              <span>{sub?.expiresAt ? 'Оплачено до' : 'Подписка'}</span><b>{sub?.expiresAt ? date : sub ? 'Без срока' : 'Не оформлена'}</b><small>Тарифы и продление</small></button>
+          </div>
+          {data.referrals && <button className={styles.invite} onClick={() => navigate('referrals')}><Gift /><span><b>Хорошим делятся</b><small>Приглашайте друзей и получайте дни VPN</small></span><ArrowRight /></button>}
+          <p className={styles.footnote}>Подписка общая с вашим личным кабинетом. Статус подключения проверяется в VPN-приложении.</p>
         </>}
-        {tab === 'menu' && <section><Heading eyebrow="ВСЁ УПРАВЛЕНИЕ" title="Меню кабинета" description="Все разделы сервиса — как в личном кабинете на сайте." />
+        {tab === 'menu' && <section><Heading title="Меню кабинета" description="Все разделы сервиса — как в личном кабинете на сайте." />
           <div className={styles.quick}>{menuItems.map(item => <button key={item.id} onClick={() => navigate(item.id)}>
             <item.icon /><b>{item.title}{item.badge ? ` · ${item.badge}` : ''}</b><span>{item.hint}</span></button>)}</div>
         </section>}
-        {tab === 'plans' && <section><Heading eyebrow="ВАШ ДОСТУП" title="Тарифы и подписка" description="Тарифы и условия обновляются из личного кабинета." />
+        {tab === 'plans' && <section><Heading title="Тарифы и подписка" description="Тарифы и условия обновляются из личного кабинета." />
           {data.plans.length === 0 && <div className={styles.empty}>Для вашего аккаунта сейчас нет доступных тарифов.</div>}
           {data.plans.map(plan => <article className={styles.plan} key={plan.id}><div><small>{plan.current ? 'ВАШ ТАРИФ' : brandName}</small>
               <h2>{plan.name}</h2><p>{plan.unlimited ? 'Без ограничения срока' : `${plan.days} дней`} · {plan.unlimitedDevices ? 'безлимит устройств' : plan.deviceAddonEnabled ? `${plan.devices}–${plan.maxDevices} устройств` : `${plan.initialDevices} устройств`}{plan.trafficLimitGb == null ? ' · безлимит трафика' : ` · ${plan.trafficLimitGb} ГБ`}</p>
@@ -374,7 +416,7 @@ export function MiniApp({ demo = false, brandName = 'VPN Cabinet', bannerUrl }: 
             {!plan.isPromo && <div className={styles.rublePrice}><span>Стоимость в кабинете</span><strong>{rub.format(plan.priceKopecks / 100)}</strong></div>}
             {!plan.isPromo && <>
               <button className={styles.sitePay} onClick={() => openBrowserCheckout(plan)}>Открыть кабинет в браузере<ArrowUpRight size={18} /></button>
-              {methodsForPlan(plan.id).length > 0 && <button className={styles.sitePay} onClick={() => setCheckoutPlanId(plan.id)}><CreditCard size={18} />Оплата в Telegram<ArrowUpRight size={18} /></button>}
+              {methodsForPlan(plan.id).length > 0 && <button className={styles.primary} onClick={() => setCheckoutPlanId(plan.id)}><CreditCard size={18} />Оплатить в Telegram</button>}
             </>}
             {data.starsEnabled && data.starsRateKopecks && <div className={styles.planBuy}>
               {plan.deviceAddonEnabled && !plan.unlimitedDevices && <label>Количество устройств
@@ -391,7 +433,7 @@ export function MiniApp({ demo = false, brandName = 'VPN Cabinet', bannerUrl }: 
             </div>}
             </article>)}
         </section>}
-        {tab === 'billing' && <section><Heading eyebrow="ОПЛАТЫ" title="Платежи" description="История оплат и автопродление — как в кабинете на сайте." />
+        {tab === 'billing' && <section><Heading title="Платежи" description="История оплат и автопродление — как в кабинете на сайте." />
           <article className={styles.plan}><div><small>АВТОПРОДЛЕНИЕ</small>
             <h2>{renewalOn ? '🟢 ' : '⚪ '}{renewalStatusLabel[autoRenewal?.status ?? 'DISABLED'] ?? autoRenewal?.status}</h2>
             {autoRenewal?.plan && <p>{autoRenewal.plan.name} · {rub.format(autoRenewal.plan.priceKopecks / 100)}{autoRenewal.plan.unlimitedDuration ? '' : ` / ${autoRenewal.plan.durationDays} дней`}</p>}
@@ -409,7 +451,7 @@ export function MiniApp({ demo = false, brandName = 'VPN Cabinet', bannerUrl }: 
           </article>
           <div className={styles.history}><h2>История платежей</h2>{payments === null && <p>Загружаем платежи…</p>}{payments?.length === 0 && <p>Платежей пока нет.</p>}{payments?.slice(0, 20).map(payment => <div className={styles.order} key={payment.id}><span><b>{payment.plan?.name || 'Подписка'}</b><small>{new Date(payment.createdAt).toLocaleDateString('ru-RU')} · {payment.provider}</small></span><span><b>{rub.format(payment.amountKopecks / 100)}</b><small>{payment.status === 'SUCCEEDED' ? 'Оплачено' : payment.status === 'PENDING' ? 'Ожидает оплаты' : payment.status === 'REFUNDED' ? 'Возврат' : 'Не оплачено'}</small></span></div>)}</div>
         </section>}
-        {tab === 'bonus' && <section><Heading eyebrow="ПОДАРКИ" title="Бонусы" description="Колесо подарков, задания и промокоды — те же, что в кабинете." />
+        {tab === 'bonus' && <section><Heading title="Бонусы" description="Колесо подарков, задания и промокоды — те же, что в кабинете." />
           {bonusOff && <div className={styles.empty}>Бонусная программа сейчас отключена. Загляните позже.</div>}
           {demo && <div className={styles.card}><div className={styles.bonusHero}><Sparkles size={40} /><h2>Колесо подарков</h2><p>2 попытки · демонстрация</p></div>
             <button className={styles.primary} onClick={() => setNotice('Это демонстрация. Розыгрыш не выполняется.')}>Крутить колесо<ArrowUpRight size={18} /></button></div>}
@@ -436,7 +478,7 @@ export function MiniApp({ demo = false, brandName = 'VPN Cabinet', bannerUrl }: 
             {data.referrals && <button className={styles.invite} onClick={() => navigate('referrals')}><Users size={26} /><span><b>Попытки за друзей</b><small>Приглашайте друзей и получайте бонусы вместе</small></span><ArrowUpRight size={20} /></button>}
           </>}
         </section>}
-        {tab === 'notifications' && <section><Heading eyebrow="СОБЫТИЯ" title="Уведомления" description="Важные события подписки и сообщения сервиса." />
+        {tab === 'notifications' && <section><Heading title="Уведомления" description="Важные события подписки и сообщения сервиса." />
           {demo && <div className={styles.card}><p>🔔 Подписка продлена на 30 дней</p><small>01.11.2026 · демонстрация</small></div>}
           {!demo && <>
             {inbox === null && <div className={styles.empty}>Загружаем уведомления…</div>}
@@ -449,7 +491,7 @@ export function MiniApp({ demo = false, brandName = 'VPN Cabinet', bannerUrl }: 
             {inbox?.some(item => item.actionHref) && <p className={styles.footnote}>Ссылки из уведомлений открывают разделы кабинета в этом же окне.</p>}
           </>}
         </section>}
-        {tab === 'settings' && <section><Heading eyebrow="ВАШ ПРОФИЛЬ" title="Настройки" description="Каналы уведомлений и данные аккаунта." />
+        {tab === 'settings' && <section><Heading title="Настройки" description="Каналы уведомлений и данные аккаунта." />
           <article className={styles.plan}><div><small>АККАУНТ</small>
             <h2>{me?.name || data.name}</h2>
             <p>{demo ? 'demo@example.test' : me?.email || 'Загружаем…'}</p>
@@ -461,7 +503,7 @@ export function MiniApp({ demo = false, brandName = 'VPN Cabinet', bannerUrl }: 
           </article>
           <a className={styles.secondary} href="/dashboard/settings">Профиль и безопасность в кабинете<ArrowUpRight size={18} /></a>
         </section>}
-        {tab === 'admin' && <section><Heading eyebrow="СЕРВИС" title="Управление" description="Статистика сервиса и вход в панель администратора." />
+        {tab === 'admin' && <section><Heading title="Управление" description="Статистика сервиса и вход в панель администратора." />
           {!data.admin && <div className={styles.empty}>Раздел доступен администраторам.</div>}
           {data.admin && demo && <div className={styles.card}><p>Демонстрация: статистика недоступна.</p></div>}
           {data.admin && !demo && <>
@@ -477,13 +519,13 @@ export function MiniApp({ demo = false, brandName = 'VPN Cabinet', bannerUrl }: 
             <a className={styles.primary} href="/dashboard/admin"><Wrench size={19} />Открыть панель управления<ArrowUpRight size={18} /></a>
           </>}
         </section>}
-        {tab === 'devices' && <section><Heading eyebrow="ПОДКЛЮЧЕНИЯ" title="Ваши устройства" description="Одно подключение для всех ваших экранов." />
+        {tab === 'devices' && <section><Heading title="Ваши устройства" description="Одно подключение для всех ваших экранов." />
           {demo ? <div className={styles.card}><div className={styles.device}><Smartphone /><span><b>iPhone</b><small>iOS · Rabbit Hole</small></span><Check /></div><div className={styles.device}><Smartphone /><span><b>MacBook</b><small>macOS · Rabbit Hole</small></span><Check /></div></div> : <DevicesList deviceLimit={sub?.deviceLimit} />}
           <button id="add-device-guide" className={styles.primary} onClick={() => navigate('connect')}>Подключить устройство<ArrowUpRight size={20} /></button></section>}
-        {tab === 'connect' && <section><Heading eyebrow="БЫСТРЫЙ СТАРТ" title="Подключить VPN" description="Установите приложение, добавьте подписку и включите подключение." />
+        {tab === 'connect' && <section><Heading title="Подключить VPN" description="Установите приложение, добавьте подписку и включите подключение." />
           {demo ? <div className={styles.card}><p>1. Установите VPN-клиент</p><p>2. Добавьте подписку {brandName}</p><p>3. Включите VPN в приложении</p><small>Персональная ссылка появится после входа.</small></div>
             : subscriptionUrl ? <KeysCard subscriptionUrl={subscriptionUrl} supportEnabled={data.support} deviceLimit={sub?.deviceLimit} /> : !busy && <div className={styles.empty}>Ссылка пока недоступна. Проверьте состояние подписки.</div>}</section>}
-        {tab === 'referrals' && <section><Heading eyebrow="ПРИГЛАШАЙТЕ ДРУЗЕЙ" title="Больше дней вместе" description={referrals?.condition || 'Новый пользователь приходит по вашей ссылке и вступает в канал. Условия бонуса задаёт сервис.'} />
+        {tab === 'referrals' && <section><Heading title="Больше дней вместе" description={referrals?.condition || 'Новый пользователь приходит по вашей ссылке и вступает в канал. Условия бонуса задаёт сервис.'} />
           <div className={styles.refHero}><Gift size={48} /><h2>Ваша рекомендация.<br />Наше спасибо.</h2><p>Бонусы поступают на ту же подписку, которой вы уже пользуетесь.</p></div>
           <div className={styles.quick}><div><strong>{referrals?.invited ?? 0}</strong><span>приглашено</span></div><div><strong>{referrals?.claimed ?? 0}</strong><span>бонусов подтверждено</span></div></div>
           {demo ? <div className={styles.notice}>Размер бонуса и канал ожидают настройки.</div> : referrals && <>
@@ -493,7 +535,7 @@ export function MiniApp({ demo = false, brandName = 'VPN Cabinet', bannerUrl }: 
             {referrals.eligible && <button className={styles.secondary} disabled={busy || Boolean(referrals.claimedAt)} onClick={() => void claim()}>{referrals.claimedAt ? 'Бонус подтверждён' : 'Я вступил, проверить'}</button>}
           </>}
         </section>}
-        {tab === 'support' && <section><Heading eyebrow="МЫ НА СВЯЗИ" title="Поможем разобраться" description="Опишите, что произошло. История обращений общая с кабинетом." />
+        {tab === 'support' && <section><Heading title="Поможем разобраться" description="Опишите, что произошло. История обращений общая с кабинетом." />
           {demo ? <DemoSupport /> : tickets && <SupportPanelDynamic mode="user" initialTickets={tickets} />}</section>}
         {busy && <div role="status" className={styles.loading}><LoaderCircle className="animate-spin" size={18} />Загрузка…</div>}
         {checkoutPlan && methodsForPlan(checkoutPlan.id).length > 0 && <div className={styles.sheetBackdrop} onClick={() => setCheckoutPlanId(null)}>
@@ -522,14 +564,14 @@ export function MiniApp({ demo = false, brandName = 'VPN Cabinet', bannerUrl }: 
             <p className={styles.sheetSecure}>ЮKassa покажет итоговую сумму с учётом скидок.</p>
           </section>
         </div>}
-        <nav className={styles.nav} aria-label="Разделы приложения">{tabs.map(item => <button key={item.id} aria-current={tab === item.id ? 'page' : undefined} onClick={() => navigate(item.id)}><item.icon size={21} /><span>{item.label}</span></button>)}</nav>
+        <nav className={styles.nav} aria-label="Разделы приложения">{tabs.map(item => <button key={item.id} aria-current={tab === item.id ? 'page' : undefined} onClick={() => navigateRoot(item.id)}><item.icon /><span>{item.label}</span></button>)}</nav>
       </>}
     </div>
   </main>
 }
 
-function Heading({ eyebrow, title, description }: { eyebrow: string; title: string; description: string }) {
-  return <div className={styles.heading}><small>{eyebrow}</small><h1>{title}</h1><p>{description}</p></div>
+function Heading({ title, description }: { title: string; description: string }) {
+  return <div className={styles.heading}><h1>{title}</h1><p>{description}</p></div>
 }
 function DemoSupport() {
   const [message, setMessage] = useState('')

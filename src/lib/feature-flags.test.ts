@@ -16,7 +16,7 @@ vi.mock('./prisma', () => ({
 
 import { getFeatureFlags, isFeatureEnabled, updateFeatureFlags } from './feature-flags'
 
-const keys = ['FEATURE_REFERRALS', 'FEATURE_SUPPORT', 'FEATURE_BROADCASTS', 'BONUS_BOX_ENABLED'] as const
+const keys = ['FEATURE_REFERRALS', 'FEATURE_SUPPORT', 'FEATURE_BROADCASTS', 'FEATURE_NEW_DESIGN', 'BONUS_BOX_ENABLED'] as const
 const original = Object.fromEntries(keys.map((key) => [key, process.env[key]]))
 
 beforeEach(() => {
@@ -40,7 +40,13 @@ describe('feature flags', () => {
       bonusBox: true,
       support: true,
       broadcasts: true,
+      newDesign: true,
     })
+  })
+
+  it('lets the environment switch everyone back to the previous design', async () => {
+    process.env.FEATURE_NEW_DESIGN = 'false'
+    await expect(isFeatureEnabled('newDesign')).resolves.toBe(false)
   })
 
   it('prefers database settings over environment flags', async () => {
@@ -50,6 +56,7 @@ describe('feature flags', () => {
       bonusBox: true,
       support: false,
       broadcasts: true,
+      newDesign: true,
     })
 
     await expect(isFeatureEnabled('bonusBox')).resolves.toBe(true)
@@ -57,7 +64,7 @@ describe('feature flags', () => {
   })
 
   it('saves all flags in the singleton row', async () => {
-    const flags = { referrals: false, bonusBox: true, support: false, broadcasts: true }
+    const flags = { referrals: false, bonusBox: true, support: false, broadcasts: true, newDesign: false }
     mocks.upsert.mockResolvedValue(flags)
 
     await expect(updateFeatureFlags(flags)).resolves.toEqual(flags)

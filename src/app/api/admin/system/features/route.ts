@@ -12,6 +12,8 @@ const schema = z.object({
   bonusBox: z.boolean(),
   support: z.boolean(),
   broadcasts: z.boolean(),
+  // Необязателен, чтобы вкладка админки, открытая до обновления, не получала 422.
+  newDesign: z.boolean().optional(),
 }).strict()
 
 export const GET = withAuth(async () => {
@@ -27,7 +29,11 @@ export const PATCH = withAuth(async (req: Request) => {
     return jsonResponse({ error: 'Некорректные настройки' }, { status: 422 })
   }
 
-  const features = await updateFeatureFlags(parsed.data)
+  const current = await getFeatureFlags()
+  const features = await updateFeatureFlags({
+    ...parsed.data,
+    newDesign: parsed.data.newDesign ?? current.newDesign,
+  })
   await writeAuditLog({
     actorId: session.uid,
     action: 'ADMIN_FEATURES_UPDATED',

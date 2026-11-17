@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { ArrowUpRight, Bell, BookOpen, Check, ChevronRight, CircleUserRound, FileDown, Gift, LockKeyhole, Mail, ReceiptText, Send, Trash2 } from 'lucide-react'
+import { ArrowUpRight, Bell, BookOpen, Check, ChevronRight, CircleUserRound, FileDown, Gift, LifeBuoy, LockKeyhole, Mail, ReceiptText, Send, Trash2, UserCog, UsersRound } from 'lucide-react'
+import { LogoutButton } from '@/components/dashboard/logout-button'
 import { getCurrentUser } from '@/lib/auth/cookies'
 import { prisma } from '@/lib/prisma'
 import { ChangePasswordForm } from '@/components/dashboard/change-password-form'
@@ -20,11 +21,11 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   const telegramClientId = process.env.TELEGRAM_CLIENT_ID?.trim() || null
   const appUrl = process.env.APP_URL?.trim() || null
   const session = await getCurrentUser()
-  if (!session) redirect('/login')
+  if (!session) redirect('/login?next=/dashboard/settings')
   const user = await prisma.user.findUnique({ where: { id: session.uid } })
   if (!user) redirect('/login')
 
-  const [features, notificationPreferences, securityEvents, resolvedSearchParams] = await Promise.all([
+  const [features, notificationPreferences, securityEvents, resolvedSearchParams, unreadNotifications] = await Promise.all([
     getFeatureFlags(),
     getNotificationPreferences(user.id),
     prisma.auditLog.findMany({
@@ -37,7 +38,10 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
       select: { id: true, action: true, message: true, createdAt: true, userAgent: true },
     }),
     searchParams,
+    prisma.userNotification.count({ where: { userId: user.id, readAt: null } }),
   ])
+  const v2 = features.newDesign
+  const isStaff = ['MODERATOR', 'ADMIN', 'SUPER_ADMIN'].includes(user.role)
   const hasEmail = !user.email.endsWith('@pending.invalid')
   const hasVerifiedEmail = Boolean(user.emailVerifiedAt && hasEmail)
   const hasTelegram = Boolean(user.telegramId)
@@ -50,10 +54,21 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
     { href: '/dashboard/referrals', label: 'Приглашения', icon: Gift, visible: features.referrals },
     { href: '/dashboard/bonus-box', label: 'Бонусы', icon: Gift, visible: features.bonusBox },
   ].filter((item) => item.visible)
+  const hubLinks = [
+    { href: '/dashboard/notifications', label: 'Уведомления', description: 'Платежи, подписка и ответы поддержки', icon: Bell, badge: unreadNotifications, visible: true },
+    { href: '/dashboard/bonus-box', label: 'Бонусы', description: 'Рулетка, задания и призы', icon: Gift, badge: 0, visible: features.bonusBox },
+    { href: '/dashboard/referrals', label: 'Пригласить друга', description: 'Ссылка и награды за друзей', icon: UsersRound, badge: 0, visible: features.referrals },
+    { href: '/dashboard/billing', label: 'Подписка и платежи', description: 'Тариф, автопродление и история оплат', icon: ReceiptText, badge: 0, visible: true },
+    { href: '/dashboard/support', label: 'Помощь', description: 'Быстрые ответы и чат с поддержкой', icon: LifeBuoy, badge: 0, visible: features.support },
+    { href: '/dashboard/admin', label: 'Открыть админку', description: 'Управление кабинетом', icon: UserCog, badge: 0, visible: isStaff },
+  ].filter((item) => item.visible)
 
   return (
-    <div className="user-workspace mx-auto max-w-6xl space-y-4 pb-8 sm:space-y-6">
-      <PageHeader title="Настройки" description="Профиль, доступ и уведомления." />
+    <div className="user-workspace mx-auto max-w-6xl space-y-4 pb-8 sm:space-y-6" data-design={v2 ? 'v2' : undefined}>
+      <PageHeader
+        title={v2 ? 'Профиль' : 'Настройки'}
+        description={v2 ? 'Аккаунт, вход, уведомления и документы.' : 'Профиль, доступ и уведомления.'}
+      />
 
       <div className="relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-950 px-4 py-4 text-white sm:px-6 sm:py-6">
         <div className="absolute inset-y-0 left-0 w-1 bg-cyan-400" aria-hidden="true" />
@@ -79,9 +94,30 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         </div>
       </div>
 
+      {v2 ? (
+        <nav aria-label="Разделы профиля" className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {hubLinks.map((item) => {
+            const Icon = item.icon
+            return (
+              <Link key={item.href} href={item.href} className="group flex min-h-16 items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 transition-colors hover:border-slate-300 hover:bg-slate-50 dark:border-white/10 dark:bg-white/[0.025] dark:hover:border-white/20 dark:hover:bg-white/[0.05]">
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-700 dark:bg-white/[0.06] dark:text-slate-200"><Icon className="h-[18px] w-[18px]" /></span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-semibold text-slate-950 dark:text-white">{item.label}</span>
+                  <span className="mt-0.5 block truncate text-xs text-slate-500 dark:text-slate-400">{item.description}</span>
+                </span>
+                {item.badge > 0 ? (
+                  <span className="grid h-5 min-w-5 place-items-center rounded-full bg-red-600 px-1.5 text-[11px] font-semibold text-white">{item.badge > 99 ? '99+' : item.badge}</span>
+                ) : null}
+                <ChevronRight className="h-4 w-4 shrink-0 text-slate-400 transition-transform group-hover:translate-x-0.5" />
+              </Link>
+            )
+          })}
+        </nav>
+      ) : null}
+
       <SettingsTabs
         initialId={initialSection}
-        footer={
+        footer={v2 ? undefined :
           <div className="space-y-0.5">
             <p className="px-3 pb-1 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400 dark:text-slate-500">Другие разделы</p>
             {relatedLinks.map((item) => {
@@ -204,6 +240,12 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
           },
         ]}
       />
+
+      {v2 ? (
+        <div className="rounded-2xl border border-slate-200 bg-white p-2 dark:border-white/10 dark:bg-white/[0.025] xl:hidden">
+          <LogoutButton />
+        </div>
+      ) : null}
     </div>
   )
 }
