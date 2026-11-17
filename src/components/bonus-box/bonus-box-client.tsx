@@ -1,6 +1,6 @@
 "use client";
 
-import { type CSSProperties, type KeyboardEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, type KeyboardEvent, type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   CalendarClock,
@@ -85,9 +85,7 @@ export function BonusBoxClient({
 }) {
   const [data, setData] = useState(initialData);
   const [attemptsOpen, setAttemptsOpen] = useState(false);
-  // Триггер диалога «Попытки закончились»: WebKit не фокусирует кнопку по клику,
-  // поэтому возвращаем фокус на неё явно через returnFocusRef модалки.
-  const getAttemptsCtaRef = useRef<HTMLButtonElement | null>(null);
+  const attemptsTriggerRef = useRef<HTMLButtonElement | null>(null);
   const [rouletteItems, setRouletteItems] = useState(() => buildIdleRoulette(initialData.prizes));
   const [roulettePhase, setRoulettePhase] = useState<RoulettePhase>("idle");
   const [spinError, setSpinError] = useState("");
@@ -670,8 +668,14 @@ export function BonusBoxClient({
     }
   }
 
+  function openAttempts(event: MouseEvent<HTMLButtonElement>) {
+    // Mobile and desktop controls coexist in the DOM.
+    attemptsTriggerRef.current = event.currentTarget;
+    setAttemptsOpen(true);
+  }
+
   const openCaseCta = noAttempts && !opening ? (
-    <button type="button" ref={getAttemptsCtaRef} className={cn(openButtonClass, "w-full")} onClick={() => setAttemptsOpen(true)}>
+    <button type="button" className={cn(openButtonClass, "w-full")} onClick={openAttempts}>
       <Gift className="mr-2 h-4 w-4" />
       Нет попыток · Получить
     </button>
@@ -890,7 +894,7 @@ export function BonusBoxClient({
       </section>
 
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
-        <button type="button" className="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-brand-600 dark:text-brand-300" onClick={() => setAttemptsOpen(true)} disabled={opening}>
+        <button type="button" className="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-brand-600 dark:text-brand-300" onClick={openAttempts} disabled={opening}>
           <Gift className="h-4 w-4" />
           {visibleMissions.some((mission) => mission.completed && !mission.claimed) ? "Забрать попытки за задания" : "Как получить попытки"}
         </button>
@@ -899,7 +903,7 @@ export function BonusBoxClient({
 
       <Modal
         open={attemptsOpen}
-        returnFocusRef={getAttemptsCtaRef}
+        returnFocusRef={attemptsTriggerRef}
         title={noAttempts ? "Попытки закончились" : "Получить попытки"}
         description="Получайте попытки за покупки и активность."
         onClose={() => setAttemptsOpen(false)}

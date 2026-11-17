@@ -21,6 +21,7 @@ export interface SessionPayload extends JWTPayload {
   email: string
   role: 'USER' | 'MODERATOR' | 'ADMIN' | 'SUPER_ADMIN'
   stage?: 'FULL' | 'EMAIL_PENDING'
+  telegramMiniApp?: true
   sv?: number
   // Только у токенов приложения: id записи MobileSession.
   sid?: string

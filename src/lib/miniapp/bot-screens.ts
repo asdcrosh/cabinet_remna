@@ -1,13 +1,15 @@
+import { getBrandName } from '@/lib/branding'
 import { prisma } from '@/lib/prisma'
 import { getMiniAppOverview } from './overview'
 import { buildAdminTicketsScreen, buildBroadcastThemesScreen, buildRichScreen, buildRichPaymentScreen, buildSupportThreadScreen, type BotScreen, type BotThreadMessage, type RichScreenInput } from './rich-screens'
 import { broadcastThemes, broadcastThemeView } from './broadcast-bot'
-import { miniAppUrl } from './config'
+import { miniAppBannerUrl, miniAppUrl } from './config'
 import { botSupportAttachmentUrl } from './attachment-sign'
 import { channelCampaign } from './channel-referrals'
 import { ensureUserReferralCode } from '@/lib/referrals'
 import { syncLocalDevicesFromRemnawave } from '@/lib/remnawave-device-sync'
 import { hasRemnawaveUserReference, remnawave, remnawaveUserReference } from '@/lib/remnawave'
+import { createBotCheckoutGrant, telegramRubleMethods } from './ruble-payments'
 import { isYookassaConfigured } from '@/lib/yookassa'
 import { getFeatureFlags } from '@/lib/feature-flags'
 
@@ -25,7 +27,7 @@ export async function getBotScreenInput(telegramId: number, screen: BotScreen, n
   const appUrl = new URL(miniAppUrl())
   if (referralCode) appUrl.searchParams.set('ref', referralCode)
   const input: RichScreenInput = { screen, appUrl: appUrl.toString(), overview: user ? await getMiniAppOverview(user.id) : null,
-    bannerUrl: process.env.TELEGRAM_MINIAPP_BANNER_URL || new URL('/miniapp/banner.png?v=3', appUrl).toString(), notice,
+    bannerUrl: miniAppBannerUrl(), brandName: getBrandName(), notice,
     admin: Boolean(user && user.role !== 'USER') }
   if (user && input.overview) {
     if (screen === 'devices' && hasRemnawaveUserReference(user)) {
@@ -56,7 +58,7 @@ export async function getBotScreenInput(telegramId: number, screen: BotScreen, n
         prisma.telegramChannelReferral.count({ where: { referrerId: user.id, claimedAt: { not: null } } }),
         prisma.telegramChannelReferral.findUnique({ where: { referredUserId: user.id } }),
       ])
-      if (campaign) input.referral = { url: `https://t.me/${process.env.TELEGRAM_MINIAPP_BOT_USERNAME || 'alekseevVP_bot'}?start=ref_${code}`,
+      if (campaign) input.referral = { url: `https://t.me/${process.env.TELEGRAM_MINIAPP_BOT_USERNAME || process.env.TELEGRAM_BOT_USERNAME || ''}?start=ref_${code}`,
         condition: `Пригласите нового пользователя до его вступления в канал: вам ${campaign.referrerDays} дн. и промокод −${campaign.referrerPromoPercent}%, другу ${campaign.referredDays} дн. Дни добавляются к активной подписке — для участия она нужна вам обоим. Лимит: ${campaign.cap} бонусов.`,
         invited, claimed, channelUrl: campaign.channelUrl, eligible: Boolean(own?.eligible), ownClaimed: Boolean(own?.claimedAt) }
     }
@@ -149,10 +151,14 @@ export async function getBotScreen(telegramId: number, screen: BotScreen, notice
 }
 
 export async function getBotPaymentScreen(telegramId: number, planId: string, promo?: { code: string; discountPercent: number } | null) {
-  const [input, yookassaAvailable] = await Promise.all([
-    getBotScreenInput(telegramId, 'plans'), isYookassaConfigured(),
+  const hasBotRublePayments = telegramRubleMethods('bot').length > 0
+  const [input, account, yookassaAvailable] = await Promise.all([
+    getBotScreenInput(telegramId, 'plans'),
+    hasBotRublePayments ? prisma.user.findUnique({ where: { telegramId: BigInt(telegramId) }, select: { id: true } }) : null,
+    hasBotRublePayments ? isYookassaConfigured() : false,
   ])
-  return buildRichPaymentScreen(input, planId, yookassaAvailable, promo ?? null)
+  const grant = account && yookassaAvailable ? createBotCheckoutGrant(account.id, planId) : null
+  return buildRichPaymentScreen(input, planId, grant, promo ?? null)
 }
 
 // Проверяет, что промокод доступен именно этому пользователю (выдан ему и не использован).

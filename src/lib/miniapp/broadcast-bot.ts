@@ -1,3 +1,4 @@
+import { getBrandName } from '@/lib/branding'
 import { prisma } from '@/lib/prisma'
 import { isFeatureEnabled } from '@/lib/feature-flags'
 import { rateLimitKey } from '@/lib/rate-limit'
@@ -254,7 +255,7 @@ async function postBroadcastToChannel(input: { text: string; image: string | nul
   button: { label: string; url: string } | null }) {
   const reference = (process.env.TELEGRAM_BROADCAST_CHANNEL_ID || process.env.TELEGRAM_REWARD_CHANNEL_ID || '').trim()
   if (!isChannelReference(reference)) return false
-  const text = input.text.replace(/\{name\}/gi, 'друг').replace(/\{plan\}/gi, 'AlekseevVP').replace(/\{days_left\}/gi, '—')
+  const text = input.text.replace(/\{name\}/gi, 'друг').replace(/\{plan\}/gi, () => getBrandName()).replace(/\{days_left\}/gi, '—')
   try {
     if (input.image) {
       await miniAppBotCall('sendPhoto', { chat_id: reference, photo: input.image,

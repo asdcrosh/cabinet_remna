@@ -14,6 +14,7 @@ export type RichScreenInput = {
   overview: MiniAppOverview | null
   appUrl: string
   bannerUrl?: string
+  brandName?: string
   referral?: { url: string; condition: string; invited: number; claimed: number; channelUrl: string | null; eligible: boolean; ownClaimed: boolean }
   devices?: BotDevice[]
   tickets?: BotTicket[]
@@ -41,7 +42,7 @@ const row = (...buttons: string[]) => `<tg-button-row>${buttons.join('')}</tg-bu
 const copyBtn = (label: string, text: string) => `<tg-button type="copy_text" text="${escape(text)}">${escape(label)}</tg-button>`
 const urlBtn = (label: string, url: string) => `<tg-button type="url" style="primary" url="${escape(url)}">${escape(label)}</tg-button>`
 const table = (rows: string[][]) => `<table bordered compact>${rows.map(cells => `<tr>${cells.map(cell => `<td>${escape(cell)}</td>`).join('')}</tr>`).join('')}</table>`
-const brandHeader = (bannerUrl?: string) => bannerUrl && /^https:\/\//.test(bannerUrl) ? `<img src="${escape(bannerUrl)}">` : '<h2>AlekseevVP</h2>'
+const brandHeader = (bannerUrl?: string, brandName = 'Личный кабинет') => bannerUrl && /^https:\/\//.test(bannerUrl) ? `<img src="${escape(bannerUrl)}">` : `<h2>${escape(brandName)}</h2>`
 const deviceEmoji = (platform: string) => {
   const value = platform.toLowerCase()
   if (value.includes('tv')) return '📺'
@@ -58,7 +59,7 @@ export function buildRichScreen(input: RichScreenInput) {
     const url = new URL(input.appUrl); url.searchParams.set('tab', tab)
     return `<tg-button type="web_app" style="success" url="${escape(url.toString())}">${escape(label)}</tg-button>`
   }
-  const parts = [brandHeader(input.bannerUrl), `<h3>${titles[input.screen]}</h3>`]
+  const parts = [brandHeader(input.bannerUrl, input.brandName), `<h3>${titles[input.screen]}</h3>`]
   if (input.notice) parts.push(`<blockquote>💬 ${escape(input.notice)}</blockquote>`)
   const data = input.overview
   if (!data) {
@@ -258,10 +259,10 @@ export function buildRichScreen(input: RichScreenInput) {
 
 // Экран «что нового» для переходов по ссылке /start update из анонса в канале.
 export function buildWhatsNewScreen(input: RichScreenInput) {
-  const parts = [brandHeader(input.bannerUrl), '<h3>⚡️ Обновление: всё главное — прямо в боте</h3>',
+  const parts = [brandHeader(input.bannerUrl, input.brandName), '<h3>⚡️ Обновление: всё главное — прямо в боте</h3>',
     '<p>Больше не нужно заходить в кабинет за каждой мелочью. Самое нужное делается прямо в чате — быстро и в пару тапов:</p>',
     table([
-      ['💳 Оплата', 'Карта и СБП — внутри Telegram, чек показываем перед оплатой'],
+      ['💳 Оплата', 'Stars в Telegram, карта и СБП в веб-кабинете'],
       ['🛟 Поддержка', 'Обращение и переписка — как обычный чат'],
       ['🔌 Подключение', 'Ссылка подписки копируется в один тап'],
       ['⚙️ Настройки', 'Каналы уведомлений переключаются кнопками'],
@@ -281,7 +282,7 @@ export function buildWhatsNewScreen(input: RichScreenInput) {
 
 // Карточка устройства: понятно, чем управляешь, прежде чем удалять.
 export function buildDeviceScreen(input: RichScreenInput, device: BotDevice) {
-  const parts = [brandHeader(input.bannerUrl), '<h3>📱 Устройство</h3>',
+  const parts = [brandHeader(input.bannerUrl, input.brandName), '<h3>📱 Устройство</h3>',
     `<h4>${deviceEmoji(device.platform)} ${escape(device.title)}</h4>`,
     table([['Платформа', device.platform]]),
     '<p>Удаление освобождает место в лимите: устройство сразу отключится от VPN, но сможет подключиться снова, пока есть свободные места.</p>',
@@ -292,7 +293,7 @@ export function buildDeviceScreen(input: RichScreenInput, device: BotDevice) {
 
 // Подтверждение отвязки устройства — до необратимого действия всегда один шаг.
 export function buildDeviceDeleteConfirm(input: RichScreenInput, device: BotDevice) {
-  const parts = [brandHeader(input.bannerUrl), '<h3>🗑 Удалить устройство?</h3>',
+  const parts = [brandHeader(input.bannerUrl, input.brandName), '<h3>🗑 Удалить устройство?</h3>',
     `<h4>${deviceEmoji(device.platform)} ${escape(device.title)}</h4>`,
     table([['Платформа', device.platform]]),
     '<p>Место в лимите освободится сразу. Вход в приложение на этом устройстве завершится. Устройство сможет подключиться снова, пока есть свободные места.</p>',
@@ -303,7 +304,7 @@ export function buildDeviceDeleteConfirm(input: RichScreenInput, device: BotDevi
 
 // Результат розыгрыша колеса подарков прямо в чате.
 export function buildSpinResultScreen(input: RichScreenInput, spin: BotSpinResult) {
-  const parts = [brandHeader(input.bannerUrl), '<h3>🎡 Колесо подарков</h3>',
+  const parts = [brandHeader(input.bannerUrl, input.brandName), '<h3>🎡 Колесо подарков</h3>',
     `<h4>🎉 ${escape(spin.prizeTitle)}</h4>`]
   if (spin.prizeDescription) parts.push(`<p>${escape(spin.prizeDescription)}</p>`)
   if (spin.promoCode) {
@@ -318,7 +319,7 @@ export function buildSpinResultScreen(input: RichScreenInput, spin: BotSpinResul
 
 // Выбор темы обращения перед вводом текста.
 export function buildSupportCategoryScreen(input: RichScreenInput, categories: Array<{ value: string; label: string; description: string }>) {
-  const parts = [brandHeader(input.bannerUrl), '<h3>🛟 Новое обращение</h3>',
+  const parts = [brandHeader(input.bannerUrl, input.brandName), '<h3>🛟 Новое обращение</h3>',
     '<p>Выберите тему — так обращение быстрее попадёт к нужному специалисту.</p>']
   for (const category of categories) {
     parts.push(row(cb(category.label, `supcat:${category.value}`)))
@@ -329,7 +330,7 @@ export function buildSupportCategoryScreen(input: RichScreenInput, categories: A
 
 // Ожидание текста обращения: следующее сообщение пользователя уйдёт в поддержку.
 export function buildSupportPromptScreen(input: RichScreenInput, prompt: { title: string; hint: string }) {
-  const parts = [brandHeader(input.bannerUrl), `<h3>✍️ ${escape(prompt.title)}</h3>`,
+  const parts = [brandHeader(input.bannerUrl, input.brandName), `<h3>✍️ ${escape(prompt.title)}</h3>`,
     `<p>${escape(prompt.hint)}</p>`,
     '<p>Просто отправьте следующее сообщение в этот чат — оно попадёт в поддержку и в ваш кабинет. Можно приложить фото или файл (JPG, PNG, WEBP, PDF до 5 МБ).</p>',
     row(cb('◀️ Отмена', 'sup:cancel'))]
@@ -340,7 +341,7 @@ export function buildSupportPromptScreen(input: RichScreenInput, prompt: { title
 // viewer 'admin' меняет подписи сторон и набор кнопок на административные.
 export function buildSupportThreadScreen(input: RichScreenInput, thread: { id: string; subject: string; status: string; userLabel?: string; assigneeLabel?: string | null; rating?: 'up' | 'down' | null; messages: BotThreadMessage[] }, opts?: { viewer?: 'user' | 'admin' }) {
   const viewer = opts?.viewer ?? 'user'
-  const parts = [brandHeader(input.bannerUrl), '<h3>🛟 Обращение</h3>',
+  const parts = [brandHeader(input.bannerUrl, input.brandName), '<h3>🛟 Обращение</h3>',
     `<h4>${escape(thread.subject)}</h4>`,
     table([
       ...(thread.userLabel ? [['👤 Пользователь', thread.userLabel]] : []),
@@ -385,7 +386,7 @@ export function buildSupportThreadScreen(input: RichScreenInput, thread: { id: s
 export function buildAdminTemplatesScreen(input: RichScreenInput,
   thread: { id: string; subject: string },
   templates: Array<{ label: string; text: string }>) {
-  const parts = [brandHeader(input.bannerUrl), '<h3>⚡ Быстрые ответы</h3>',
+  const parts = [brandHeader(input.bannerUrl, input.brandName), '<h3>⚡ Быстрые ответы</h3>',
     `<h4>${escape(thread.subject)}</h4>`,
     '<p>Нажмите на шаблон — он сразу уйдёт пользователю в этот чат и в кабинет.</p>']
   templates.forEach((template, index) => {
@@ -400,7 +401,7 @@ export function buildAdminTemplatesScreen(input: RichScreenInput,
 export function buildAdminAssignScreen(input: RichScreenInput,
   thread: { id: string; subject: string },
   admins: Array<{ id: string; label: string; current: boolean }>) {
-  const parts = [brandHeader(input.bannerUrl), '<h3>👤 Назначить исполнителя</h3>',
+  const parts = [brandHeader(input.bannerUrl, input.brandName), '<h3>👤 Назначить исполнителя</h3>',
     `<h4>${escape(thread.subject)}</h4>`,
     '<p>Исполнитель виден команде в кабинете и в этом окне.</p>']
   for (const admin of admins) {
@@ -414,7 +415,7 @@ export type BotAdminTicket = { id: string; subject: string; status: string; user
 
 // Очередь обращений для администратора — ответить можно прямо из бота.
 export function buildAdminTicketsScreen(input: RichScreenInput, tickets: BotAdminTicket[]) {
-  const parts = [brandHeader(input.bannerUrl), '<h3>🛟 Обращения пользователей</h3>']
+  const parts = [brandHeader(input.bannerUrl, input.brandName), '<h3>🛟 Обращения пользователей</h3>']
   if (input.notice) parts.push(`<blockquote>💬 ${escape(input.notice)}</blockquote>`)
   if (!tickets.length) parts.push('<p>✅ Открытых обращений нет.</p>')
   if (tickets.length) {
@@ -432,7 +433,7 @@ export type BotBroadcastThemeView = { key: string; label: string; segmentLabel: 
 
 // Выбор темы рассылки: кнопка действия и аудитория подставятся автоматически.
 export function buildBroadcastThemesScreen(input: RichScreenInput, themes: BotBroadcastThemeView[]) {
-  const parts = [brandHeader(input.bannerUrl), '<h3>📢 Новая рассылка</h3>']
+  const parts = [brandHeader(input.bannerUrl, input.brandName), '<h3>📢 Новая рассылка</h3>']
   if (input.notice) parts.push(`<blockquote>💬 ${escape(input.notice)}</blockquote>`)
   parts.push('<p>Выберите тему — к сообщению сама добавится кнопка, которая открывает нужный раздел бота.</p>',
     table(themes.map(theme => [theme.label, `${theme.segmentLabel}${theme.buttonLabel ? ` · кнопка «${theme.buttonLabel}»` : ''}`])))
@@ -445,7 +446,7 @@ export function buildBroadcastThemesScreen(input: RichScreenInput, themes: BotBr
 
 // Ожидание текста рассылки: следующее сообщение администратора — черновик.
 export function buildBroadcastPromptScreen(input: RichScreenInput, theme: BotBroadcastThemeView) {
-  const parts = [brandHeader(input.bannerUrl), `<h3>📢 ${escape(theme.label)}</h3>`]
+  const parts = [brandHeader(input.bannerUrl, input.brandName), `<h3>📢 ${escape(theme.label)}</h3>`]
   if (input.notice) parts.push(`<blockquote>💬 ${escape(input.notice)}</blockquote>`)
   parts.push(table([['👥 Аудитория', theme.segmentLabel], ['🔘 Кнопка в сообщении', theme.buttonLabel ?? 'Без кнопки']]),
     `<p>${escape(theme.hint)}</p>`,
@@ -460,7 +461,7 @@ export function buildBroadcastPromptScreen(input: RichScreenInput, theme: BotBro
 // Превью перед отправкой: администратор видит ровно то, что уйдёт пользователям.
 export function buildBroadcastPreviewScreen(input: RichScreenInput, draft: { themeLabel: string; segmentLabel: string;
   buttonLabel: string | null; buttonTarget?: string | null; text: string; withImage?: boolean }) {
-  const parts = [brandHeader(input.bannerUrl), '<h3>📢 Проверьте рассылку</h3>']
+  const parts = [brandHeader(input.bannerUrl, input.brandName), '<h3>📢 Проверьте рассылку</h3>']
   if (input.notice) parts.push(`<blockquote>💬 ${escape(input.notice)}</blockquote>`)
   parts.push(table([['Тема', draft.themeLabel], ['👥 Аудитория', draft.segmentLabel], ['🔘 Кнопка', draft.buttonLabel ?? 'Без кнопки'],
     ...(draft.buttonTarget ? [['🔗 Куда ведёт', draft.buttonTarget]] : []),
@@ -476,7 +477,7 @@ export function buildBroadcastPreviewScreen(input: RichScreenInput, draft: { the
 // Рассылка поставлена в очередь.
 export function buildBroadcastSentScreen(input: RichScreenInput, stats: { themeLabel: string; recipients: number;
   limited: boolean; channelPosted?: boolean }) {
-  const parts = [brandHeader(input.bannerUrl), '<h3>🚀 Рассылка в очереди</h3>',
+  const parts = [brandHeader(input.bannerUrl, input.brandName), '<h3>🚀 Рассылка в очереди</h3>',
     table([['Тема', stats.themeLabel], ['👥 Получателей', String(stats.recipients)],
       ['📣 Канал', stats.channelPosted ? 'Отправлено' : 'Не отправлено']])]
   if (stats.limited) parts.push('<p>⚠️ Достигнут лимит в 5000 получателей — часть аудитории не вошла.</p>')
@@ -489,24 +490,24 @@ export function buildBroadcastSentScreen(input: RichScreenInput, stats: { themeL
 
 // Подтверждение отключения автопродления.
 export function buildAutoRenewalOffConfirm(input: RichScreenInput) {
-  const parts = [brandHeader(input.bannerUrl), '<h3>⏸ Отключить автопродление?</h3>',
+  const parts = [brandHeader(input.bannerUrl, input.brandName), '<h3>⏸ Отключить автопродление?</h3>',
     '<p>Автоматическое списание прекратится. Подписка будет действовать до конца оплаченного срока — продлить её можно в любой момент вручную.</p>',
     row(cb('✅ Да, отключить', 'renew:offyes', 'success')),
     row(cb('◀️ Отмена', 'billing'))]
   return parts.join('')
 }
 
-export function buildRichPaymentScreen(input: RichScreenInput, planId: string, yookassaAvailable: boolean,
+export function buildRichPaymentScreen(input: RichScreenInput, planId: string, botCheckoutGrant: string | null,
   promo?: { code: string; discountPercent: number } | null) {
   const plan = input.overview?.plans.find(item => item.id === planId && !item.isPromo)
-  if (!plan) return `${brandHeader(input.bannerUrl)}<h3>💳 Тариф недоступен</h3><p>Откройте актуальный список тарифов.</p>${row(cb('💎 К тарифам', 'plans'))}`
+  if (!plan) return `${brandHeader(input.bannerUrl, input.brandName)}<h3>💳 Тариф недоступен</h3><p>Откройте актуальный список тарифов.</p>${row(cb('💎 К тарифам', 'plans'))}`
   const checkoutUrl = new URL(input.appUrl)
   checkoutUrl.searchParams.set('tab', 'plans')
   checkoutUrl.searchParams.set('plan', plan.id)
   if (promo) checkoutUrl.searchParams.set('promo', promo.code)
   const discounted = promo ? Math.round(plan.priceKopecks * (100 - promo.discountPercent) / 100) : null
   const parts = [
-    `${brandHeader(input.bannerUrl)}<h3>💳 Способ оплаты</h3>`,
+    `${brandHeader(input.bannerUrl, input.brandName)}<h3>💳 Способ оплаты</h3>`,
     `<h4>💎 ${escape(plan.name)}</h4>`,
     table([
       ['⏳ Срок', plan.unlimited ? 'Бессрочно' : `${plan.days} дней`],
@@ -514,23 +515,22 @@ export function buildRichPaymentScreen(input: RichScreenInput, planId: string, y
         ? [['🏷 Промокод', `${promo.code} · −${promo.discountPercent}%`], ['💰 К оплате', formatPrice(discounted)]]
         : [['💰 Базовая стоимость', formatPrice(plan.priceKopecks)]]),
     ]),
-    promo
-      ? '<p>Скидка уже учтена: карта, СБП и Stars возьмут сумму со скидкой.</p>'
-      : '<p>Итоговая сумма со скидками появится перед оплатой. Карта и СБП открываются прямо здесь, в Telegram.</p>',
+    '<p>Итоговая сумма со скидками появится перед оплатой.</p>',
   ]
-  if (yookassaAvailable) parts.push(row(`<tg-button type="web_app" style="success" url="${escape(checkoutUrl.toString())}">💳 Оплатить картой или СБП</tg-button>`))
+  if (botCheckoutGrant) checkoutUrl.searchParams.set('botCheckout', botCheckoutGrant)
+  else checkoutUrl.searchParams.set('browserCheckout', '1')
+  parts.push(row(`<tg-button type="web_app" style="success" url="${escape(checkoutUrl.toString())}">${botCheckoutGrant ? '💳 Выбрать способ оплаты' : '🌐 Оплата на сайте'}</tg-button>`))
   if (input.overview?.starsEnabled && input.overview.starsRateKopecks) {
     parts.push(row(cb(promo && discounted != null ? `⭐ Оплатить в Stars · ${formatPrice(discounted)}` : '⭐ Оплатить в Stars',
       promo ? `buyp:${plan.id}:${promo.code}` : `buy:${plan.id}`)))
   }
-  if (!yookassaAvailable && !input.overview?.starsEnabled) parts.push('<p>Оплата сейчас недоступна.</p>')
   parts.push('<hr><p>Бот и кабинет используют один аккаунт: оплата из любого места продлит ту же подписку.</p>', row(cb('💎 К тарифам', 'plans')))
   return parts.join('')
 }
 
 // Экран обязательной подписки на канал: видят приглашённые пользователи до вступления.
 export function buildChannelGateScreen(channelUrl: string, notice?: string) {
-  const parts = ['<h2>AlekseevVP</h2>', '<h3>📢 Подписка на канал</h3>']
+  const parts = [brandHeader(), '<h3>📢 Подписка на канал</h3>']
   if (notice) parts.push(`<blockquote>💬 ${escape(notice)}</blockquote>`)
   parts.push(
     '<p>Чтобы пользоваться ботом, подпишитесь на наш канал — там новости сервиса, промокоды и розыгрыши.</p>',
@@ -544,7 +544,7 @@ export function buildChannelGateScreen(channelUrl: string, notice?: string) {
 // Экран выставленного счёта Stars: живёт в едином окне, сам инвойс — под ним.
 export function buildStarsInvoiceScreen(input: { planName: string; durationLabel: string;
   starsAmount: number; promoCode?: string | null }) {
-  const parts = ['<h2>AlekseevVP</h2>', '<h3>⭐ Счёт на оплату</h3>']
+  const parts = [brandHeader(), '<h3>⭐ Счёт на оплату</h3>']
   parts.push(table([
     ['💎 Тариф', input.planName],
     ['📅 Срок', input.durationLabel],

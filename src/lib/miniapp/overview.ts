@@ -1,3 +1,4 @@
+import { getBrandName } from '@/lib/branding'
 import { prisma } from '@/lib/prisma'
 import { getFeatureFlags } from '@/lib/feature-flags'
 import { remnawave } from '@/lib/remnawave'
@@ -32,7 +33,7 @@ export async function getMiniAppOverview(userId: string): Promise<MiniAppOvervie
     name: user.name?.split(' ')[0] || user.telegramUsername || 'друг',
     subscription: presentation ? { title: presentation.title, description: presentation.description,
       usable: presentation.usable, daysLeft: presentation.daysLeft, expiresAt: presentation.expireAt?.toISOString() ?? null,
-      planName: local?.plan?.name || 'AlekseevVP', deviceLimit: local?.plan?.unlimitedDevices ? null : local?.deviceLimit ?? local?.plan?.deviceLimit ?? null,
+      planName: local?.plan?.name || getBrandName(), deviceLimit: local?.plan?.unlimitedDevices ? null : local?.deviceLimit ?? local?.plan?.deviceLimit ?? null,
       pending: Boolean(local?.pendingSync) } : null,
     deviceCount: user._count.devices, support: features.support, referrals: features.referrals,
     admin: user.role !== 'USER',

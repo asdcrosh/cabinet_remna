@@ -1,10 +1,10 @@
 'use client'
 
 import { useEffect } from 'react'
+import { loadTelegramMiniAppSdk } from '@/lib/telegram-miniapp-client'
 import { markTelegramMiniApp } from '@/lib/telegram-miniapp-viewport'
 
 const SESSION_KEY = 'remnawave-cabinet:telegram-miniapp'
-const SCRIPT_ID = 'telegram-web-app-sdk'
 
 export function TelegramMiniAppScript() {
   useEffect(() => {
@@ -21,20 +21,7 @@ export function TelegramMiniAppScript() {
 
     markTelegramMiniApp(document.documentElement)
 
-    if (window.Telegram?.WebApp) {
-      window.dispatchEvent(new Event('telegram-web-app-ready'))
-      return
-    }
-    if (document.getElementById(SCRIPT_ID)) return
-
-    const script = document.createElement('script')
-    script.id = SCRIPT_ID
-    script.src = 'https://telegram.org/js/telegram-web-app.js?62'
-    script.async = true
-    script.addEventListener('load', () => {
-      window.dispatchEvent(new Event('telegram-web-app-ready'))
-    }, { once: true })
-    document.head.appendChild(script)
+    void loadTelegramMiniAppSdk()
   }, [])
 
   return null

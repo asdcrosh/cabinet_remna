@@ -65,20 +65,23 @@ describe('Telegram Mini App boundaries', () => {
     expect(html).toContain('avp:pay:demo')
     expect(html).toContain('остаток прежнего не переносится')
   })
-  it('opens card checkout inside Telegram and keeps Stars in the bot', () => {
+  it('offers browser checkout by default, signed bot checkout when enabled, and Stars', () => {
     const input = { screen: 'plans' as const, overview: miniAppDemo, appUrl: 'https://cabinet.example.test/miniapp' }
-    const html = buildRichPaymentScreen(input, 'demo', true)
+    const html = buildRichPaymentScreen(input, 'demo', 'signed-grant')
     expect(html).toContain('type="web_app"')
     expect(html).toContain('https://cabinet.example.test/miniapp?tab=plans&amp;plan=demo')
     expect(html).toContain('avp:buy:demo')
-    expect(buildRichPaymentScreen(input, 'demo', false)).not.toContain('plan=demo')
-    expect(buildRichPaymentScreen(input, 'unknown', true)).not.toContain('plan=demo')
+    expect(html).toContain('botCheckout=signed-grant')
+    const defaultCheckout = buildRichPaymentScreen(input, 'demo', null)
+    expect(defaultCheckout).toContain('browserCheckout=1')
+    expect(defaultCheckout).not.toContain('botCheckout=')
+    expect(buildRichPaymentScreen(input, 'unknown', 'signed-grant')).not.toContain('plan=demo')
   })
   it('uses one safe brand banner on bot and payment screens', () => {
     const input = { screen: 'home' as const, overview: miniAppDemo,
       appUrl: 'https://cabinet.example.test/miniapp', bannerUrl: 'https://cabinet.example.test/miniapp/banner.png' }
     expect(buildRichScreen(input)).toContain('<img src="https://cabinet.example.test/miniapp/banner.png">')
-    expect(buildRichPaymentScreen(input, 'demo', true)).toContain('<img src="https://cabinet.example.test/miniapp/banner.png">')
+    expect(buildRichPaymentScreen(input, 'demo', 'signed-grant')).toContain('<img src="https://cabinet.example.test/miniapp/banner.png">')
     expect(buildRichScreen({ ...input, bannerUrl: 'http://insecure.example/banner.png' })).not.toContain('<img')
   })
   it('rounds the configured ruble price up to whole Stars', () => {
@@ -175,7 +178,7 @@ describe('Telegram Mini App boundaries', () => {
     expect(promoPlans).toContain('avp:payp:')
     expect(promoPlans).toContain('avp:plans')
     const paymentPromo = buildRichPaymentScreen({ screen: 'plans', overview: miniAppDemo, appUrl,
-      activePromo: { code: 'SALE10', discountPercent: 10 } }, 'demo', true, { code: 'SALE10', discountPercent: 10 })
+      activePromo: { code: 'SALE10', discountPercent: 10 } }, 'demo', 'signed-grant', { code: 'SALE10', discountPercent: 10 })
     expect(paymentPromo).toContain('promo=SALE10')
     expect(paymentPromo).toContain('avp:buyp:demo:SALE10')
   })
