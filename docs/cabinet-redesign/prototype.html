@@ -1,0 +1,595 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Прототип новой структуры кабинета</title>
+<style>
+  :root {
+    --brand: #d832d4;
+    --brand-2: #5424bc;
+    --brand-text: #9a1597;
+    --ink: #17102d;
+    --muted: #64607a;
+    --line: #e7e4f0;
+    --bg: #f6f5fa;
+    --card: #ffffff;
+    --ok: #0f9f6e;
+    --ok-soft: #e6f6ef;
+    --warn: #b7791f;
+    --warn-soft: #fdf4e3;
+    --radius: 16px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    color: var(--ink);
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #ecebf3; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  a { color: inherit; }
+  .wrap { max-width: 1320px; margin: 0 auto; padding: 32px 24px 64px; }
+  .intro h1 { margin: 0; font-size: 28px; letter-spacing: -0.02em; }
+  .intro p { margin: 8px 0 0; color: var(--muted); max-width: 760px; line-height: 1.5; }
+  .switch { display: inline-flex; margin-top: 20px; background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 4px; gap: 4px; }
+  .switch button { border: 0; background: transparent; padding: 9px 16px; border-radius: 9px; font-weight: 600; font-size: 14px; color: var(--muted); }
+  .switch button[aria-pressed="true"] { background: var(--ink); color: #fff; }
+  .stage { display: none; margin-top: 28px; }
+  .stage.active { display: grid; }
+  .user-stage { grid-template-columns: 390px minmax(0, 1fr); gap: 40px; align-items: start; }
+  .note { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 20px 22px; line-height: 1.55; font-size: 14px; }
+  .note h2 { margin: 0 0 8px; font-size: 17px; }
+  .note h3 { margin: 18px 0 6px; font-size: 14px; }
+  .note ul { margin: 0; padding-left: 18px; }
+  .note li { margin: 4px 0; }
+  .note .tag { display: inline-block; font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: #f3e8ff; color: var(--brand-2); margin-right: 4px; }
+  .note .was { color: var(--muted); text-decoration: line-through; }
+
+  /* ---------- phone ---------- */
+  .phone { width: 390px; height: 800px; background: var(--bg); border-radius: 44px; border: 10px solid #111; position: relative; overflow: hidden; box-shadow: 0 30px 60px -30px rgba(23,16,45,.45); }
+  .topbar { position: absolute; inset: 0 0 auto 0; height: 56px; padding: 0 16px; display: flex; align-items: center; gap: 8px; background: rgba(246,245,250,.92); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); z-index: 3; }
+  .topbar .title { flex: 1; font-weight: 700; font-size: 17px; }
+  .icon-btn { position: relative; width: 40px; height: 40px; border-radius: 12px; border: 1px solid var(--line); background: #fff; display: grid; place-items: center; }
+  .icon-btn svg { width: 18px; height: 18px; }
+  .count { position: absolute; top: -5px; right: -5px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--brand); color: #fff; font-size: 11px; font-weight: 700; line-height: 18px; text-align: center; }
+  .screen { position: absolute; inset: 56px 0 76px 0; overflow-y: auto; padding: 16px; display: none; }
+  .screen.active { display: block; }
+  .tabbar { position: absolute; inset: auto 8px 8px 8px; height: 64px; background: #fff; border: 1px solid var(--line); border-radius: 18px; display: grid; grid-template-columns: repeat(5, 1fr); padding: 4px; z-index: 3; box-shadow: 0 10px 30px -18px rgba(23,16,45,.35); }
+  .tab { border: 0; background: transparent; border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; font-size: 11.5px; font-weight: 600; color: var(--muted); position: relative; }
+  .tab svg { width: 20px; height: 20px; }
+  .tab[aria-current="page"] { color: var(--brand-text); background: #fbf0fb; }
+  .tab .count { top: 2px; right: 18px; }
+
+  /* ---------- content blocks ---------- */
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; margin-bottom: 12px; }
+  .hero { background: linear-gradient(140deg, var(--brand-2), var(--brand)); color: #fff; border: 0; padding: 20px; }
+  .hero .row { display: flex; justify-content: space-between; align-items: center; }
+  .pill { font-size: 12px; font-weight: 700; padding: 3px 9px; border-radius: 999px; background: rgba(255,255,255,.2); }
+  .pill.ok { background: var(--ok-soft); color: var(--ok); }
+  .pill.warn { background: var(--warn-soft); color: var(--warn); }
+  .hero .big { font-size: 40px; font-weight: 800; letter-spacing: -0.03em; margin: 12px 0 2px; }
+  .hero .sub { opacity: .85; font-size: 14px; }
+  .btn { display: flex; width: 100%; align-items: center; justify-content: center; gap: 8px; min-height: 48px; border-radius: 12px; border: 1px solid var(--line); background: #fff; font-weight: 700; font-size: 15px; margin-top: 12px; text-decoration: none; }
+  .btn.primary { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .hero .btn { background: #fff; color: var(--ink); border: 0; margin-top: 18px; }
+  .btn.ghost { border: 0; background: transparent; color: var(--brand-text); min-height: 40px; margin-top: 4px; }
+  .tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px; }
+  .tile { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 12px; text-align: left; }
+  .tile small { display: block; color: var(--muted); font-size: 11.5px; }
+  .tile b { display: block; font-size: 17px; margin-top: 4px; }
+  .tile.ok b { color: var(--ok); }
+  .section-title { font-size: 13px; font-weight: 700; color: var(--muted); margin: 18px 4px 8px; }
+  .row-item { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+  .row-item:last-child { border-bottom: 0; }
+  .row-item .ico { width: 36px; height: 36px; border-radius: 10px; background: #f4f2fa; display: grid; place-items: center; flex: none; }
+  .row-item .ico svg { width: 18px; height: 18px; }
+  .row-item .txt { flex: 1; min-width: 0; }
+  .row-item .txt b { display: block; font-size: 14.5px; }
+  .row-item .txt span { display: block; color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+  .row-item .chev { color: #b7b3c7; }
+  .row-item.danger b { color: #c0264b; }
+  .offer { display: flex; gap: 12px; align-items: center; background: #fffaf0; border-color: #f6e3bd; }
+  .offer .txt { flex: 1; }
+  .offer b { font-size: 14px; }
+  .offer span { display: block; font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+  .mini-btn { border: 0; background: var(--ink); color: #fff; font-weight: 700; font-size: 13px; padding: 9px 12px; border-radius: 10px; white-space: nowrap; }
+  .bonus-row { display: flex; align-items: center; gap: 12px; }
+  .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 4px 0 14px; }
+  .steps div { font-size: 12px; font-weight: 600; color: var(--muted); border-top: 3px solid var(--line); padding-top: 6px; }
+  .steps div.on { color: var(--ink); border-color: var(--brand); }
+  .status-line { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--ok); flex: none; }
+  .muted { color: var(--muted); font-size: 13px; line-height: 1.45; }
+  .faq summary { list-style: none; cursor: pointer; font-weight: 600; font-size: 14.5px; padding: 12px 0; display: flex; justify-content: space-between; }
+  .faq summary::-webkit-details-marker { display: none; }
+  .faq details { border-bottom: 1px solid var(--line); }
+  .faq details:last-child { border-bottom: 0; }
+  .faq p { margin: 0 0 12px; color: var(--muted); font-size: 13.5px; line-height: 1.5; }
+  .segment { display: flex; gap: 6px; overflow-x: auto; margin-bottom: 12px; }
+  .segment button { border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 7px 12px; font-size: 13px; font-weight: 600; white-space: nowrap; }
+  .segment button.on { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .avatar { width: 52px; height: 52px; border-radius: 16px; background: var(--ink); color: #fff; display: grid; place-items: center; font-weight: 800; font-size: 20px; }
+
+  /* ---------- admin ---------- */
+  .admin-stage { grid-template-columns: minmax(0, 1fr) 340px; gap: 28px; align-items: start; }
+  .desk { background: var(--bg); border-radius: 18px; border: 1px solid #d9d6e5; overflow: hidden; display: grid; grid-template-columns: 236px minmax(0, 1fr); height: 760px; box-shadow: 0 30px 60px -36px rgba(23,16,45,.45); }
+  .side { background: #1c1238; color: #d8d3ea; padding: 16px 12px; display: flex; flex-direction: column; gap: 2px; }
+  .brand { display: flex; align-items: center; gap: 10px; color: #fff; font-weight: 700; padding: 4px 8px 14px; }
+  .brand i { width: 30px; height: 30px; border-radius: 9px; background: linear-gradient(140deg, var(--brand-2), var(--brand)); display: block; }
+  .search-k { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; padding: 9px 10px; border-radius: 10px; background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.1); color: #a9a2c4; font-size: 13px; white-space: nowrap; text-align: left; }
+  .search-k kbd { margin-left: auto; font-size: 11px; background: rgba(255,255,255,.12); border-radius: 5px; padding: 1px 6px; font-family: inherit; }
+  .nav-a { border: 0; background: transparent; display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 9px; font-size: 14px; font-weight: 500; color: inherit; text-align: left; width: 100%; }
+  .nav-a svg { width: 17px; height: 17px; opacity: .75; }
+  .nav-a:hover { background: rgba(255,255,255,.06); }
+  .nav-a[aria-current="page"] { background: #fff; color: var(--ink); }
+  .nav-a .badge { margin-left: auto; background: #e0365b; color: #fff; font-size: 11px; font-weight: 700; border-radius: 999px; padding: 1px 7px; }
+  .nav-sub { padding-left: 37px; font-size: 13.5px; }
+  .side .foot { margin-top: auto; border-top: 1px solid rgba(255,255,255,.1); padding: 12px 8px 0; font-size: 12.5px; color: #a9a2c4; }
+  .main { overflow-y: auto; padding: 24px 28px; }
+  .main h2 { margin: 0; font-size: 24px; letter-spacing: -0.02em; }
+  .main .lead { color: var(--muted); margin: 4px 0 18px; font-size: 14px; }
+  .queue { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); }
+  .q { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto auto; gap: 12px; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+  .q:last-child { border-bottom: 0; }
+  .q .sev { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; font-size: 15px; font-weight: 800; }
+  .sev.red { background: #fde8ed; color: #c0264b; }
+  .sev.amber { background: var(--warn-soft); color: var(--warn); }
+  .sev.blue { background: #e9f0ff; color: #2f5bd3; }
+  .q b { font-size: 14px; }
+  .q span { display: block; font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+  .q .n { font-weight: 800; font-size: 16px; }
+  .q .act { border: 1px solid var(--line); background: #fff; border-radius: 9px; padding: 7px 11px; font-weight: 600; font-size: 13px; }
+  .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 16px; }
+  .kpi { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 14px; }
+  .kpi small { color: var(--muted); font-size: 12px; }
+  .kpi b { display: block; font-size: 22px; margin-top: 4px; }
+  .crumbs { font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+  .client-head { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+  .client-head .who { flex: 1; min-width: 220px; }
+  .client-head .who b { font-size: 18px; display: block; }
+  .client-head .who span { color: var(--muted); font-size: 13px; }
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .actions button { border: 1px solid var(--line); background: #fff; border-radius: 10px; padding: 9px 13px; font-weight: 600; font-size: 13.5px; }
+  .actions button.primary { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .actions button.danger { color: #c0264b; }
+  .admin-tabs { display: flex; gap: 4px; margin: 14px 0; border-bottom: 1px solid var(--line); overflow-x: auto; }
+  .admin-tabs button { border: 0; background: transparent; padding: 10px 12px; font-weight: 600; font-size: 13.5px; color: var(--muted); border-bottom: 2px solid transparent; white-space: nowrap; }
+  .admin-tabs button.on { color: var(--ink); border-color: var(--brand); }
+  .facts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .main-view { display: none; }
+  .main-view.active { display: block; }
+  .palette { position: absolute; inset: 0; background: rgba(23,16,45,.35); display: none; align-items: flex-start; justify-content: center; padding-top: 90px; z-index: 10; }
+  .palette.open { display: flex; }
+  .palette-box { width: 520px; background: #fff; border-radius: 16px; box-shadow: 0 30px 70px -20px rgba(23,16,45,.5); overflow: hidden; }
+  .palette-box input { width: 100%; border: 0; border-bottom: 1px solid var(--line); padding: 16px 18px; font-size: 16px; outline: none; }
+  .palette-box .grp { padding: 8px 18px 4px; font-size: 11.5px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+  .palette-box .opt { padding: 10px 18px; font-size: 14px; display: flex; justify-content: space-between; }
+  .palette-box .opt:hover, .palette-box .opt.sel { background: #f6f2fd; }
+  .palette-box .opt span { color: var(--muted); font-size: 12.5px; }
+  .desk-wrap { position: relative; }
+  @media (max-width: 1100px) {
+    .user-stage, .admin-stage { grid-template-columns: 1fr; }
+    .desk { grid-template-columns: 1fr; height: auto; }
+    .side { display: none; }
+  }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <symbol id="i-home" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4 6v6c0 5 3.4 8.4 8 9 4.6-.6 8-4 8-9V6z"/><path d="m9 12 2 2 4-4"/></symbol>
+    <symbol id="i-card" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18"/></symbol>
+    <symbol id="i-help" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14"/><path d="M12 17h.01"/></symbol>
+    <symbol id="i-user" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
+    <symbol id="i-bell" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 8 3 8H3s3-1 3-8"/><path d="M10 20a2 2 0 0 0 4 0"/></symbol>
+    <symbol id="i-gift" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13M5 12v9h14v-9"/><path d="M12 8S10.5 3 8 3.5 7.5 8 12 8zm0 0s1.5-5 4-4.5S16.5 8 12 8z"/></symbol>
+    <symbol id="i-device" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2" width="12" height="20" rx="2"/><path d="M11 18h2"/></symbol>
+    <symbol id="i-link" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></symbol>
+    <symbol id="i-send" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4z"/><path d="M22 2 11 13"/></symbol>
+    <symbol id="i-doc" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z"/><path d="M14 3v5h5"/></symbol>
+    <symbol id="i-out" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5M21 12H9"/></symbol>
+    <symbol id="i-today" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></symbol>
+    <symbol id="i-users" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="4"/><path d="M2 21a7 7 0 0 1 14 0M16 3.5a4 4 0 0 1 0 9M22 21a7 7 0 0 0-4-6.3"/></symbol>
+    <symbol id="i-chat" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L3 21l1.9-6.4A8 8 0 1 1 21 12z"/></symbol>
+    <symbol id="i-tag" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.5"/></symbol>
+    <symbol id="i-mega" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11v2a1 1 0 0 0 1 1h3l6 5V5L7 10H4a1 1 0 0 0-1 1z"/><path d="M16 9a4 4 0 0 1 0 6"/></symbol>
+    <symbol id="i-chart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15v2M12 10v7M17 6v11"/></symbol>
+    <symbol id="i-gear" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.6 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.6-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></symbol>
+  </defs>
+</svg>
+
+<div class="wrap">
+  <header class="intro">
+    <h1>Новая структура кабинета — прототип</h1>
+    <p>Кликабельная схема: разделы, порядок блоков и навигация. Цвета взяты из текущего бренда, финальный визуал рисуется отдельно. Обоснование — в <code>README.md</code> рядом.</p>
+    <div class="switch" role="group" aria-label="Режим">
+      <button type="button" data-stage="user" aria-pressed="true">Кабинет пользователя</button>
+      <button type="button" data-stage="admin" aria-pressed="false">Админка</button>
+    </div>
+  </header>
+
+  <!-- =================== USER =================== -->
+  <section class="stage user-stage active" id="stage-user" aria-label="Кабинет пользователя">
+    <div class="phone">
+      <div class="topbar">
+        <div class="title" id="phone-title">Главная</div>
+        <button class="icon-btn" type="button" data-go="bonus" aria-label="Бонусы, 4 попытки"><svg><use href="#i-gift"/></svg><span class="count">4</span></button>
+        <button class="icon-btn" type="button" data-go="notif" aria-label="Уведомления, 2 новых"><svg><use href="#i-bell"/></svg><span class="count">2</span></button>
+      </div>
+
+      <!-- Главная -->
+      <div class="screen active" data-screen="home" data-title="Главная">
+        <div class="card hero">
+          <div class="row"><span style="font-weight:700">Стандарт · 5 устройств</span><span class="pill">Работает</span></div>
+          <div class="big">30 дней</div>
+          <div class="sub">Оплачено до 17 декабря · автопродление включено</div>
+          <button class="btn" type="button" data-go="vpn">Подключить устройство →</button>
+        </div>
+        <div class="tiles">
+          <button class="tile" type="button" data-go="vpn"><small>Устройства</small><b>1 / 5</b></button>
+          <button class="tile ok" type="button" data-go="sub"><small>Автопродление</small><b>Вкл</b></button>
+          <button class="tile" type="button" data-go="vpn"><small>Трафик</small><b>12 ГБ</b></button>
+        </div>
+        <div class="card offer">
+          <div class="txt"><b>Белые списки</b><span>Доступ, когда мобильный интернет ограничен</span></div>
+          <button class="mini-btn" type="button" data-go="sub">Подключить</button>
+        </div>
+        <div class="card bonus-row">
+          <div class="row-item" style="padding:0;border:0;flex:1"><div class="ico"><svg><use href="#i-gift"/></svg></div><div class="txt"><b>У вас 4 попытки</b><span>Крутите рулетку и забирайте призы</span></div></div>
+          <button class="mini-btn" type="button" data-go="bonus">Крутить</button>
+        </div>
+        <p class="muted" style="padding:4px">Здесь больше ничего нет — остальное в разделах снизу.</p>
+      </div>
+
+      <!-- VPN -->
+      <div class="screen" data-screen="vpn" data-title="VPN">
+        <div class="card"><div class="status-line"><span class="dot"></span>VPN работает · до 17 декабря · 12 ГБ</div></div>
+        <div class="card">
+          <div class="muted">Это устройство: iPhone</div>
+          <div class="steps"><div class="on">1. Установить</div><div>2. Добавить</div><div>3. Включить</div></div>
+          <b style="font-size:18px">Установите INCY</b>
+          <p class="muted">Приложение для работы VPN. После установки вернитесь сюда.</p>
+          <button class="btn primary" type="button">Установить INCY</button>
+          <button class="btn ghost" type="button">Уже установлено</button>
+        </div>
+        <div class="section-title" id="devices">Устройства · 1 из 5</div>
+        <div class="card">
+          <div class="row-item"><div class="ico"><svg><use href="#i-device"/></svg></div><div class="txt"><b>iPhone Ивана</b><span>Активно сегодня</span></div><span class="chev">✎</span></div>
+          <div class="row-item"><div class="ico">＋</div><div class="txt"><b>Подключить ещё одно</b><span>Откройте кабинет на нём и пройдите 3 шага</span></div></div>
+          <button class="btn" type="button" data-go="sub">Докупить устройства</button>
+        </div>
+        <div class="section-title">Ссылка подключения</div>
+        <div class="card">
+          <div class="row-item"><div class="ico"><svg><use href="#i-link"/></svg></div><div class="txt"><b>Скопировать ссылку</b><span>Для ручного добавления в приложение</span></div></div>
+          <div class="row-item"><div class="ico">▦</div><div class="txt"><b>Показать QR-код</b><span>Отсканируйте с другого устройства</span></div></div>
+          <div class="row-item"><div class="ico"><svg><use href="#i-lock"/></svg></div><div class="txt"><b>Сменить ссылку</b><span>Если ссылка попала к чужим</span></div></div>
+        </div>
+        <div class="card"><b>Не работает?</b><p class="muted">Проверим соединение. Если не поможет — откроем обращение с уже выбранной темой.</p><button class="btn" type="button" data-go="help">Проверить и получить помощь</button></div>
+      </div>
+
+      <!-- Подписка -->
+      <div class="screen" data-screen="sub" data-title="Подписка">
+        <div class="card">
+          <div class="row-item" style="padding-top:0"><div class="txt"><b style="font-size:18px">Стандарт</b><span>Оплачено до 17 декабря · 5 устройств</span></div><span class="pill ok">Активна</span></div>
+          <div class="muted">Продление: 130 ₽ за 7 дней</div>
+          <button class="btn primary" type="button">Продлить</button>
+          <button class="btn" type="button">Сменить тариф</button>
+        </div>
+        <div class="section-title">Дополнения</div>
+        <div class="card">
+          <div class="row-item"><div class="ico">🌐</div><div class="txt"><b>Белые списки</b><span>Не подключены · 99 ₽ до конца подписки</span></div><button class="mini-btn" type="button">Подключить</button></div>
+          <div class="row-item"><div class="ico"><svg><use href="#i-device"/></svg></div><div class="txt"><b>Доп. устройства</b><span>Сейчас 5, можно до 20</span></div><button class="mini-btn" type="button">Докупить</button></div>
+        </div>
+        <div class="section-title">Автопродление</div>
+        <div class="card">
+          <div class="row-item"><div class="txt"><b>Включено</b><span>VISA •••• 4567 · следующее списание 16 декабря</span></div></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><button class="btn" type="button">Приостановить</button><button class="btn" type="button">Отвязать карту</button></div>
+        </div>
+        <div class="card offer"><div class="txt"><b>У вас есть промокод −25%</b><span>Выигран в рулетке, действует до 1 декабря</span></div><button class="mini-btn" type="button">Применить</button></div>
+        <div class="section-title">Платежи</div>
+        <div class="card">
+          <div class="row-item"><div class="txt"><b>Стандарт · 7 дней</b><span>16 октября · ЮKassa</span></div><b>130 ₽</b></div>
+          <div class="row-item"><div class="txt"><b>Стандарт · 7 дней</b><span>9 октября · ЮKassa</span></div><b>130 ₽</b></div>
+          <button class="btn ghost" type="button">Все платежи →</button>
+        </div>
+      </div>
+
+      <!-- Помощь -->
+      <div class="screen" data-screen="help" data-title="Помощь">
+        <div class="section-title" style="margin-top:4px">Быстрые ответы</div>
+        <div class="card faq">
+          <details><summary>Не подключается VPN <span>›</span></summary><p>Проверьте, что VPN включён в приложении, и смените сервер. Если не помогло — нажмите «Написать нам», тема уже будет выбрана.</p></details>
+          <details><summary>Оплатил, а доступа нет <span>›</span></summary><p>Обычно доступ появляется за минуту. Нажмите «Проверить оплату» в разделе Подписка.</p></details>
+          <details><summary>Как подключить ещё устройство <span>›</span></summary><p>Откройте кабинет на нём и пройдите 3 шага в разделе VPN.</p></details>
+          <details><summary>Как отключить автопродление <span>›</span></summary><p>Подписка → Автопродление → «Приостановить» или «Отвязать карту».</p></details>
+          <details><summary>Сменить ссылку подключения <span>›</span></summary><p>VPN → Ссылка подключения → «Сменить ссылку».</p></details>
+        </div>
+        <button class="btn primary" type="button">Написать нам</button>
+        <div class="section-title">Мои обращения</div>
+        <div class="segment"><button class="on" type="button">Активные</button><button type="button">Архив</button></div>
+        <div class="card"><div class="row-item"><div class="ico"><svg><use href="#i-chat"/></svg></div><div class="txt"><b>Не работает на ноутбуке</b><span>Ответ поддержки · 10 минут назад</span></div><span class="count" style="position:static">1</span></div></div>
+      </div>
+
+      <!-- Профиль -->
+      <div class="screen" data-screen="profile" data-title="Профиль">
+        <div class="card" style="display:flex;gap:14px;align-items:center"><div class="avatar">И</div><div><b style="font-size:17px">Иван</b><div class="muted">ivan@example.com · Telegram подключён</div></div></div>
+        <div class="section-title">Аккаунт</div>
+        <div class="card">
+          <div class="row-item"><div class="ico"><svg><use href="#i-user"/></svg></div><div class="txt"><b>Имя и email</b><span>Email подтверждён</span></div><span class="chev">›</span></div>
+          <div class="row-item"><div class="ico"><svg><use href="#i-lock"/></svg></div><div class="txt"><b>Безопасность</b><span>Пароль и активные входы</span></div><span class="chev">›</span></div>
+          <div class="row-item"><div class="ico"><svg><use href="#i-send"/></svg></div><div class="txt"><b>Telegram</b><span>@ivan</span></div><span class="chev">›</span></div>
+        </div>
+        <div class="section-title">Ещё</div>
+        <div class="card">
+          <button class="row-item" type="button" data-go="notif" style="width:100%;border:0;border-bottom:1px solid var(--line);background:none;text-align:left"><div class="ico"><svg><use href="#i-bell"/></svg></div><div class="txt"><b>Уведомления</b><span>Лента и каналы: Telegram, email</span></div><span class="chev">›</span></button>
+          <button class="row-item" type="button" data-go="bonus" style="width:100%;border:0;border-bottom:1px solid var(--line);background:none;text-align:left"><div class="ico"><svg><use href="#i-gift"/></svg></div><div class="txt"><b>Бонусы и приглашения</b><span>4 попытки · пригласить друга</span></div><span class="chev">›</span></button>
+          <div class="row-item"><div class="ico"><svg><use href="#i-doc"/></svg></div><div class="txt"><b>Документы и данные</b><span>Оферта, политика, экспорт и удаление</span></div><span class="chev">›</span></div>
+        </div>
+        <div class="card"><div class="row-item danger"><div class="ico"><svg><use href="#i-out"/></svg></div><div class="txt"><b>Выйти</b></div></div></div>
+      </div>
+
+      <!-- Бонусы -->
+      <div class="screen" data-screen="bonus" data-title="Бонусы">
+        <div class="segment"><button class="on" type="button">Рулетка</button><button type="button">Задания</button><button type="button">Пригласить друга</button><button type="button">Мои призы</button></div>
+        <div class="card" style="text-align:center;padding:28px 16px;background:linear-gradient(160deg,#241448,#3b1a6b);color:#fff;border:0">
+          <div style="font-size:13px;opacity:.75">Попыток: 4 · подарок гарантирован через 3</div>
+          <div style="font-size:54px;margin:14px 0">🎁</div>
+          <button class="btn" type="button" style="background:#fff;color:var(--ink);border:0">Крутить</button>
+        </div>
+        <div class="card"><b>Лучшие призы</b><p class="muted">−25% на продление · +7 дней · +1 попытка</p></div>
+        <div class="card"><b>Пригласить друга</b><p class="muted">Вы получите 7 дней и попытку, друг — скидку на первую покупку.</p><button class="btn" type="button">Поделиться ссылкой</button></div>
+      </div>
+
+      <!-- Уведомления -->
+      <div class="screen" data-screen="notif" data-title="Уведомления">
+        <div class="segment"><button class="on" type="button">Все</button><button type="button">Платежи</button><button type="button">Подписка</button><button type="button">Помощь</button><button type="button">Бонусы</button></div>
+        <div class="card">
+          <div class="row-item"><div class="ico"><svg><use href="#i-chat"/></svg></div><div class="txt"><b>Ответ поддержки</b><span>«Попробуйте сменить сервер…» · 10 мин</span></div></div>
+          <div class="row-item"><div class="ico"><svg><use href="#i-card"/></svg></div><div class="txt"><b>Платёж не прошёл</b><span>Выберите другой способ оплаты · вчера</span></div></div>
+        </div>
+        <button class="btn" type="button">Настроить каналы</button>
+      </div>
+
+      <nav class="tabbar" aria-label="Нижнее меню">
+        <button class="tab" type="button" data-go="home" aria-current="page"><svg><use href="#i-home"/></svg>Главная</button>
+        <button class="tab" type="button" data-go="vpn"><svg><use href="#i-shield"/></svg>VPN</button>
+        <button class="tab" type="button" data-go="sub"><svg><use href="#i-card"/></svg>Подписка</button>
+        <button class="tab" type="button" data-go="help"><svg><use href="#i-help"/></svg>Помощь<span class="count">1</span></button>
+        <button class="tab" type="button" data-go="profile"><svg><use href="#i-user"/></svg>Профиль</button>
+      </nav>
+    </div>
+
+    <aside class="note" id="user-note" aria-live="polite"></aside>
+  </section>
+
+  <!-- =================== ADMIN =================== -->
+  <section class="stage admin-stage" id="stage-admin" aria-label="Админка">
+    <div class="desk-wrap">
+      <div class="desk">
+        <nav class="side" aria-label="Меню админки">
+          <div class="brand"><i></i>Админка</div>
+          <button class="search-k" type="button" data-palette><svg width="15" height="15"><use href="#i-search"/></svg>Найти…<kbd>⌘K</kbd></button>
+          <button class="nav-a" type="button" data-view="today" aria-current="page"><svg><use href="#i-today"/></svg>Сегодня<span class="badge">7</span></button>
+          <button class="nav-a" type="button" data-view="client"><svg><use href="#i-users"/></svg>Клиенты</button>
+          <button class="nav-a" type="button" data-view="today"><svg><use href="#i-card"/></svg>Платежи</button>
+          <button class="nav-a" type="button" data-view="today"><svg><use href="#i-chat"/></svg>Поддержка<span class="badge">3</span></button>
+          <button class="nav-a" type="button" data-view="today"><svg><use href="#i-tag"/></svg>Продажи</button>
+          <button class="nav-a nav-sub" type="button" data-view="today">Тарифы</button>
+          <button class="nav-a nav-sub" type="button" data-view="today">Промокоды и акции</button>
+          <button class="nav-a nav-sub" type="button" data-view="today">Рефералы</button>
+          <button class="nav-a nav-sub" type="button" data-view="today">Бонусы</button>
+          <button class="nav-a" type="button" data-view="today"><svg><use href="#i-mega"/></svg>Рассылки</button>
+          <button class="nav-a" type="button" data-view="today"><svg><use href="#i-chart"/></svg>Аналитика</button>
+          <button class="nav-a" type="button" data-view="today"><svg><use href="#i-gear"/></svg>Система</button>
+          <div class="foot">admin@example.com<br>Главный администратор · <u>Кабинет</u></div>
+        </nav>
+        <div class="main">
+          <div class="main-view active" data-mview="today">
+            <h2>Сегодня</h2>
+            <p class="lead">Что требует действия. Каждую строку можно закрыть, не уходя со страницы.</p>
+            <div class="queue">
+              <div class="q"><div class="sev red">!</div><div><b>Оплачено, но не выдано</b><span>Клиент заплатил, доступ не появился</span></div><span class="n">2</span><button class="act" type="button">Довыдать все</button></div>
+              <div class="q"><div class="sev red">✉</div><div><b>Обращения без ответа</b><span>Самое старое ждёт 42 минуты (SLA 30)</span></div><span class="n">3</span><button class="act" type="button">Открыть</button></div>
+              <div class="q"><div class="sev amber">₽</div><div><b>Зависшие платежи</b><span>В ожидании дольше 15 минут</span></div><span class="n">1</span><button class="act" type="button">Проверить</button></div>
+              <div class="q"><div class="sev amber">≠</div><div><b>Расхождения подписок</b><span>Кабинет и Remnawave показывают разный срок</span></div><span class="n">0</span><button class="act" type="button">Проверить все</button></div>
+              <div class="q"><div class="sev blue">⧉</div><div><b>Возможные дубли</b><span>Telegram и email одного человека</span></div><span class="n">1</span><button class="act" type="button">Объединить</button></div>
+            </div>
+            <div class="kpis">
+              <div class="kpi"><small>Регистрации сегодня</small><b>6</b></div>
+              <div class="kpi"><small>Оплаты сегодня</small><b>14</b></div>
+              <div class="kpi"><small>Выручка сегодня</small><b>4 820 ₽</b></div>
+              <div class="kpi"><small>Конверсия 7 дней</small><b>18%</b></div>
+            </div>
+            <p class="lead" style="margin-top:12px"><u>Вся аналитика →</u></p>
+          </div>
+
+          <div class="main-view" data-mview="client">
+            <div class="crumbs">Клиенты › ivan@example.com</div>
+            <div class="client-head">
+              <div class="avatar">И</div>
+              <div class="who"><b>ivan@example.com</b><span>Иван · @ivan · с 3 марта · 6 оплат</span></div>
+              <div class="actions">
+                <button class="primary" type="button">Продлить</button>
+                <button type="button">Сменить тариф</button>
+                <button type="button">Начислить попытки</button>
+                <button class="danger" type="button">Отключить</button>
+              </div>
+            </div>
+            <div class="admin-tabs"><button class="on" type="button">Подписка</button><button type="button">Платежи</button><button type="button">Устройства</button><button type="button">Белые списки</button><button type="button">Бонусы</button><button type="button">Обращения</button><button type="button">История</button></div>
+            <div class="facts">
+              <div class="kpi"><small>Тариф</small><b style="font-size:17px">Стандарт · активна</b></div>
+              <div class="kpi"><small>Оплачено до</small><b style="font-size:17px">17 декабря</b></div>
+              <div class="kpi"><small>Устройства</small><b style="font-size:17px">1 / 5</b></div>
+              <div class="kpi"><small>Белые списки</small><b style="font-size:17px">нет · <u>выдать</u></b></div>
+              <div class="kpi"><small>Личная скидка</small><b style="font-size:17px">10% · <u>изменить</u></b></div>
+              <div class="kpi"><small>Автопродление</small><b style="font-size:17px">вкл · VISA 4567</b></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="palette" id="palette" role="dialog" aria-modal="true" aria-label="Поиск">
+        <div class="palette-box">
+          <input value="ivan" aria-label="Поиск">
+          <div class="grp">Клиенты</div>
+          <div class="opt sel" data-view-from-palette="client">ivan@example.com <span>Стандарт · до 17 дек</span></div>
+          <div class="opt">ivanov.p@mail.ru <span>нет подписки</span></div>
+          <div class="grp">Платежи</div>
+          <div class="opt">#a91f… ivan@example.com <span>130 ₽ · 16 окт</span></div>
+          <div class="grp">Действия</div>
+          <div class="opt">Новый промокод <span>Продажи</span></div>
+          <div class="opt">Новая рассылка <span>Рассылки</span></div>
+        </div>
+      </div>
+    </div>
+    <aside class="note">
+      <h2>Админка: 8 разделов вместо 21</h2>
+      <ul>
+        <li><span class="tag">Сегодня</span>Обзор + Уведомления + Контроль подписок + Дубли — одна очередь с кнопками</li>
+        <li><span class="tag">Клиенты</span>Карточка клиента вместо «⋯» и 5 модалок; Белые списки — фильтр и вкладка</li>
+        <li><span class="tag">Платежи</span>+ вкладка «Требуют выдачи»</li>
+        <li><span class="tag">Поддержка</span>Шаблоны и SLA прямо здесь</li>
+        <li><span class="tag">Продажи</span>Тарифы · Промокоды и акции (= Промокоды + Предложения + Кампании) · Рефералы · Бонусы</li>
+        <li><span class="tag">Система</span>Оформление, Функции, Платёжки, Remnashop, Ноды, Мониторинг (Watch + Состояние), Журнал</li>
+      </ul>
+      <h3>Попробуйте</h3>
+      <ul>
+        <li>Нажмите «Найти клиента…» или <b>⌘K</b> → Enter: откроется карточка клиента</li>
+        <li>«Продлить» в карточке — по умолчанию продление, а не перезапись</li>
+      </ul>
+      <h3>Было</h3>
+      <p class="muted">21 пункт меню, 8 из них ниже края на ноутбуке 1440×900; поиск только на «Обзоре»; продление клиенту ≈6 кликов через «⋯».</p>
+    </aside>
+  </section>
+</div>
+
+<script>
+  const notes = {
+    home: {
+      title: 'Главная', body: `
+        <h2>Главная: статус и одно действие</h2>
+        <ul>
+          <li>Первым — карточка подписки с <b>одной</b> кнопкой по ситуации (Купить / Подключить / Продлить / Возобновить)</li>
+          <li>«Мой доступ» — 3 плитки, каждая ведёт в свой раздел</li>
+          <li>Максимум одно предложение (белые списки → устройства → попытки → друг)</li>
+          <li>Рулетка — одна строка, полная версия в Бонусах</li>
+        </ul>
+        <h3>Убрано</h3>
+        <ul><li class="was">Рулетка на весь первый экран</li><li class="was">«Всегда под рукой» (дублировал меню)</li><li class="was">Карточка «Больше возможностей» → переехала в Подписку</li></ul>`
+    },
+    vpn: {
+      title: 'VPN', body: `
+        <h2>VPN: подключение и устройства в одном месте</h2>
+        <ul>
+          <li>Строка статуса сверху</li>
+          <li>Мастер «Установить → Добавить → Включить» остаётся</li>
+          <li><b>Устройства</b> — здесь же (раньше отдельная страница вне меню)</li>
+          <li>Ссылка, QR и смена ссылки — открыты, не спрятаны в «Не получается?»</li>
+          <li>«Не работает?» ведёт в Помощь с выбранной темой</li>
+        </ul>
+        <h3>Было</h3><p class="muted">Раздел назывался то «Подключение», то «VPN»; устройства — серая ссылка внизу; срок и трафик свёрнуты.</p>`
+    },
+    sub: {
+      title: 'Подписка', body: `
+        <h2>Подписка: всё про деньги и тариф</h2>
+        <ul>
+          <li>Тариф и срок → <b>Продлить</b> / Сменить тариф (каталог тарифов — шаг внутри)</li>
+          <li>Дополнения: белые списки и доп. устройства</li>
+          <li>Автопродление: «Приостановить» и «Отвязать карту» — обычные кнопки</li>
+          <li>Промокоды пользователя — тут, где их применяют</li>
+          <li>Последние платежи + «Все платежи»</li>
+        </ul>
+        <h3>Было</h3><p class="muted">«Оплата» не была в меню, 4 разных названия; пауза — серый текст внизу; промокоды — во вкладке «Призы» в Бонусах.</p>`
+    },
+    help: {
+      title: 'Помощь', body: `
+        <h2>Помощь: сначала ответ, потом обращение</h2>
+        <ul>
+          <li>5 быстрых ответов на частые вопросы</li>
+          <li>«Написать нам» — тема уже выбрана, если пришли из «Не работает?»</li>
+          <li>Мои обращения: Активные / Архив, счётчик ответа на вкладке</li>
+        </ul>
+        <h3>Было</h3><p class="muted">Ни одного готового ответа: любая проблема — сразу новое обращение.</p>`
+    },
+    profile: {
+      title: 'Профиль', body: `
+        <h2>Профиль вместо «Ещё»</h2>
+        <ul>
+          <li>Нормальная страница со списком, а не выезжающее меню</li>
+          <li>Аккаунт, безопасность, Telegram, уведомления, бонусы и приглашения, документы</li>
+          <li>«Выйти» — отдельно и красным</li>
+          <li>Для сотрудников — строка «Открыть админку»</li>
+        </ul>
+        <h3>Было</h3><p class="muted">«Приглашения» были доступны только из Настроек, а на телефоне этот блок вообще скрыт.</p>`
+    },
+    bonus: {
+      title: 'Бонусы', body: `
+        <h2>Бонусы = рулетка + приглашения</h2>
+        <ul>
+          <li>Вход: 🎁 с числом попыток в верхней полосе, строка на Главной, пункт в Профиле, пункт в меню на ПК</li>
+          <li>Вкладки: Рулетка · Задания · Пригласить друга · Мои призы</li>
+          <li>Без жаргона: «Лучшие призы» вместо «Главные дропы», «подарок гарантирован через 3» вместо «До гарантии»</li>
+        </ul>`
+    },
+    notif: {
+      title: 'Уведомления', body: `
+        <h2>Уведомления: колокольчик снова на телефоне</h2>
+        <ul><li>Раньше на телефоне колокольчик был скрыт — лента открывалась только через «Ещё»</li><li>Каналы (Telegram, email) — кнопкой здесь и в Профиле</li></ul>`
+    },
+  }
+
+  const phone = document.querySelector('.phone')
+  const title = document.getElementById('phone-title')
+  const userNote = document.getElementById('user-note')
+  function go(name) {
+    phone.querySelectorAll('.screen').forEach((s) => s.classList.toggle('active', s.dataset.screen === name))
+    phone.querySelectorAll('.tab').forEach((t) => {
+      if (t.dataset.go === name) t.setAttribute('aria-current', 'page')
+      else t.removeAttribute('aria-current')
+    })
+    title.textContent = notes[name].title
+    userNote.innerHTML = notes[name].body
+    const active = phone.querySelector('.screen.active')
+    if (active) active.scrollTop = 0
+  }
+  phone.addEventListener('click', (event) => {
+    const target = event.target.closest('[data-go]')
+    if (target) go(target.dataset.go)
+  })
+  go('home')
+
+  document.querySelectorAll('[data-stage]').forEach((button) => {
+    button.addEventListener('click', () => {
+      document.querySelectorAll('[data-stage]').forEach((b) => b.setAttribute('aria-pressed', String(b === button)))
+      document.getElementById('stage-user').classList.toggle('active', button.dataset.stage === 'user')
+      document.getElementById('stage-admin').classList.toggle('active', button.dataset.stage === 'admin')
+    })
+  })
+
+  const palette = document.getElementById('palette')
+  function showView(view) {
+    document.querySelectorAll('.main-view').forEach((v) => v.classList.toggle('active', v.dataset.mview === view))
+    document.querySelectorAll('.nav-a').forEach((n) => {
+      const isCurrent = n.dataset.view === view && (view === 'client' ? n.textContent.includes('Клиенты') : n.textContent.includes('Сегодня'))
+      if (isCurrent) n.setAttribute('aria-current', 'page')
+      else n.removeAttribute('aria-current')
+    })
+  }
+  document.querySelectorAll('.nav-a').forEach((n) => n.addEventListener('click', () => showView(n.dataset.view)))
+  document.querySelector('[data-palette]').addEventListener('click', () => palette.classList.add('open'))
+  palette.addEventListener('click', (event) => {
+    const option = event.target.closest('[data-view-from-palette]')
+    if (option) { showView(option.dataset.viewFromPalette); palette.classList.remove('open'); return }
+    if (event.target === palette) palette.classList.remove('open')
+  })
+  document.addEventListener('keydown', (event) => {
+    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+      event.preventDefault()
+      if (document.getElementById('stage-admin').classList.contains('active')) palette.classList.add('open')
+    }
+    if (event.key === 'Escape') palette.classList.remove('open')
+    if (event.key === 'Enter' && palette.classList.contains('open')) { showView('client'); palette.classList.remove('open') }
+  })
+</script>
+</body>
+</html>

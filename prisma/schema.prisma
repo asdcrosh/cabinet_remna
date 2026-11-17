@@ -186,6 +186,7 @@ model FeatureSetting {
   bonusBox   Boolean  @default(true)
   support    Boolean  @default(true)
   broadcasts Boolean  @default(true)
+  newDesign  Boolean  @default(true)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 }

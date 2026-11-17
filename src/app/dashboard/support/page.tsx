@@ -3,7 +3,8 @@ import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth/cookies'
 import { serializeSupportMessage, serializeSupportTicket } from '@/lib/support'
 import { SupportPanelDynamic } from '@/components/support/support-panel-dynamic'
-import { isFeatureEnabled } from '@/lib/feature-flags'
+import { getFeatureFlags } from '@/lib/feature-flags'
+import { SupportQuickAnswers } from '@/components/support/support-quick-answers'
 import { formatPrice } from '@/lib/format'
 import { paymentProviderLabel } from '@/lib/payment-provider-label'
 import { supportCategories, type SupportCategoryValue } from '@/lib/support'
@@ -17,7 +18,8 @@ export default async function SupportPage({
 }: {
   searchParams: Promise<{ category?: string; payment?: string; request?: string; ticket?: string }>
 }) {
-  if (!await isFeatureEnabled('support')) notFound()
+  const features = await getFeatureFlags()
+  if (!features.support) notFound()
   const session = await getCurrentUser()
   if (!session) redirect('/login?next=/dashboard/support')
   const params = await searchParams
@@ -92,9 +94,17 @@ export default async function SupportPage({
           ].join('\n')
         : ''
 
+  const newTicketOpen = Boolean(payment || params.category || accountRequest)
+  // Быстрые ответы прячем, когда человек пришёл с готовой темой или ему уже ответили.
+  const showQuickAnswers = features.newDesign
+    && !newTicketOpen
+    && !tickets.some((ticket) => ticket.userUnreadCount > 0)
+
   return (
-    <div>
+    <div data-design={features.newDesign ? 'v2' : undefined}>
+      {showQuickAnswers ? <SupportQuickAnswers /> : null}
       <SupportPanelDynamic
+        userTitle={features.newDesign ? 'Помощь' : undefined}
         mode="user"
         initialTickets={tickets.map((ticket) => ({
           ...serializeSupportTicket(ticket),
@@ -103,7 +113,7 @@ export default async function SupportPage({
         initialTicketId={ticketId}
         initialCategory={payment ? 'payment' : category}
         initialMessage={initialMessage}
-        initialNewTicketOpen={Boolean(payment || params.category || accountRequest)}
+        initialNewTicketOpen={newTicketOpen}
       />
     </div>
   )

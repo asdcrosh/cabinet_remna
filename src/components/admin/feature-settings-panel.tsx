@@ -1,7 +1,7 @@
 'use client'
 
 import { type ComponentType, useRef, useState } from 'react'
-import { Check, Gift, LifeBuoy, Loader2, Send, UsersRound } from 'lucide-react'
+import { Check, Gift, LayoutDashboard, LifeBuoy, Loader2, Send, UsersRound } from 'lucide-react'
 import type { FeatureFlags } from '@/lib/feature-flags'
 import { Switch } from '@/components/ui/switch'
 import { cn } from '@/lib/cn'
@@ -16,6 +16,7 @@ const items: Array<{
   { key: 'bonusBox', title: 'Подарки', description: 'Подарочный бокс', icon: Gift },
   { key: 'support', title: 'Поддержка', description: 'Обращения клиентов', icon: LifeBuoy },
   { key: 'broadcasts', title: 'Рассылки', description: 'Кабинет, Telegram и email', icon: Send },
+  { key: 'newDesign', title: 'Новый дизайн', description: 'Новая навигация кабинета и админки. Выключите, чтобы вернуть прежний', icon: LayoutDashboard },
 ]
 
 export function FeatureSettingsPanel({ initialFeatures }: { initialFeatures: FeatureFlags }) {

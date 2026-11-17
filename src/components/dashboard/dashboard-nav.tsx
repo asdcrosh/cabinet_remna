@@ -635,7 +635,7 @@ function useLiveBadges(initialBadges: NavBadges, supportEnabled: boolean, showAd
   return badges
 }
 
-function useNavBadgeValues(fallback: NavBadges) {
+export function useNavBadgeValues(fallback: NavBadges) {
   return useContext(NavBadgesContext) ?? fallback
 }
 

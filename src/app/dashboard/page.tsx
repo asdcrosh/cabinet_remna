@@ -9,6 +9,7 @@ import {
   CalendarDays,
   LifeBuoy,
   CreditCard,
+  Gift,
   Globe2,
   KeyRound,
   MonitorSmartphone,
@@ -35,17 +36,14 @@ import { HomeDeviceAddon } from '@/components/dashboard/home-device-addon'
 import { BonusBoxClientDynamic } from '@/components/bonus-box/bonus-box-client-dynamic'
 import { LoadingPanel } from '@/components/ui/loading-panel'
 import { getBonusBoxOverview } from '@/lib/bonus-box'
-import {
-  getWhitelistAddonRemainingSeconds,
-  hasWhitelistAddonEntitlement,
-  isWhitelistAddonCurrentlyActive,
-} from '@/lib/whitelist-addon-policy'
+import { countAvailableBonusBoxAttempts } from '@/lib/bonus-box-attempts'
+import { buildDeviceAddonOffer, buildWhitelistAddonOffer } from '@/lib/subscription-addon-offers'
 
 export const dynamic = 'force-dynamic'
 
 export default async function DashboardHome() {
   const session = await getCurrentUser()
-  if (!session) redirect('/login')
+  if (!session) redirect('/login?next=/dashboard')
 
   const freshPendingCutoff = getFreshPendingPaymentCutoff()
   const [features, user, paymentProviders, whitelistPlan] = await Promise.all([
@@ -91,6 +89,31 @@ export default async function DashboardHome() {
     hasRemnawaveProfile: Boolean(user.remnawaveUsername),
     pendingSync: Boolean(subRow?.pendingSync),
     deviceCount: user._count.devices,
+  }
+
+  if (!user.remnawaveUsername && features.newDesign) {
+    // Новый дизайн для пользователя без подписки: первым экраном — следующий шаг к VPN.
+    return (
+      <div className={cn('user-workspace', styles.page)} data-design="v2">
+        <HomeHeader name={dashboardDisplayName(user.name, user.email)} />
+        {user.payments[0] ? (
+          <PendingPaymentCard payment={user.payments[0]} />
+        ) : (
+          <DashboardOnboardingCard
+            state={onboardingState}
+            mode="full"
+            supportEnabled={features.support}
+            focus="access"
+          />
+        )}
+        {whitelistPlan ? <HomeWhitelistPlans planId={whitelistPlan.id} /> : null}
+        {features.bonusBox ? (
+          <Suspense fallback={null}>
+            <HomeBonusTeaser userId={session.uid} />
+          </Suspense>
+        ) : null}
+      </div>
+    )
   }
 
   if (!user.remnawaveUsername) {
@@ -183,88 +206,32 @@ export default async function DashboardHome() {
           label: 'Управлять подключением',
           icon: <KeyRound className="h-4 w-4" />,
         }
-  const whitelistAddonRow = user.subscriptions.find((subscription) =>
-    hasWhitelistAddonEntitlement(subscription, now)
-  ) ?? subRow
-  const whitelistAddonActive = Boolean(
-    whitelistAddonRow && isWhitelistAddonCurrentlyActive(whitelistAddonRow, now)
-  )
-  const derivedPausedSeconds = whitelistAddonRow?.whitelistAddonActive && !whitelistAddonActive
-    ? getWhitelistAddonRemainingSeconds(
-        whitelistAddonRow.whitelistAddonExpireAt,
-        whitelistAddonRow.whitelistAddonPausedAt
-          ?? (whitelistAddonRow.expireAt < now ? whitelistAddonRow.expireAt : now)
-      )
-    : 0n
-  const whitelistAddonPausedSeconds = whitelistAddonRow?.whitelistAddonRemainingSeconds
-    && whitelistAddonRow.whitelistAddonRemainingSeconds > 0n
-    ? whitelistAddonRow.whitelistAddonRemainingSeconds
-    : derivedPausedSeconds
-  const whitelistAddonConfigured = Boolean(
-    whitelistAddonRow?.plan?.whitelistAddonEnabled
-    && whitelistAddonRow.plan.whitelistAddonPriceKopecks > 0
-    && whitelistAddonRow.plan.whitelistAddonInternalSquads.length > 0
-  )
-  const whitelistAddonPaused = whitelistAddonPausedSeconds > 0n
-  const canBuyWhitelistAddon = Boolean(
-    whitelistAddonRow
-    && subscriptionState.usable
-    && effectiveExpireAt
-    && effectiveExpireAt > now
-  )
-  const whitelistAddonOffer = whitelistAddonRow
-    && whitelistAddonRow.planId
-    && whitelistAddonRow.plan
-    && (whitelistAddonPaused || canBuyWhitelistAddon)
-    && (whitelistAddonActive || whitelistAddonPaused || whitelistAddonConfigured)
-    ? {
-        planId: whitelistAddonRow.planId,
-        priceKopecks: whitelistAddonRow.plan.whitelistAddonPriceKopecks,
-        active: whitelistAddonActive,
-        expireAt: whitelistAddonRow.whitelistAddonExpireAt?.toISOString() ?? null,
-        pausedRemainingSeconds: whitelistAddonPaused
-          ? Number(whitelistAddonPausedSeconds)
-          : undefined,
-      }
-    : null
+  const whitelistAddonOffer = buildWhitelistAddonOffer({
+    subscriptions: user.subscriptions,
+    usable: subscriptionState.usable,
+    effectiveExpireAt,
+    now,
+  })
   const currentDeviceLimit = subRow?.deviceLimit ?? subRow?.plan?.deviceLimit ?? null
-  const deviceAddonExpireAt = sub?.expiresAt ? new Date(sub.expiresAt) : subRow?.expireAt ?? null
-  const deviceAddonOffer = subRow?.planId
-    && subRow.plan
-    && subRow.plan.deviceAddonEnabled
-    && !subRow.plan.unlimitedDevices
-    && currentDeviceLimit
-    && currentDeviceLimit < subRow.plan.maxDeviceLimit
-    && subRow.plan.extraDevicePriceKopecks > 0
-    && subscriptionState.usable
-    && ['ACTIVE', 'LIMITED'].includes(subRow.status)
-    && deviceAddonExpireAt
-    && deviceAddonExpireAt.getTime() > Date.now()
-    ? {
-        planId: subRow.planId,
-        currentLimit: currentDeviceLimit,
-        maxLimit: subRow.plan.maxDeviceLimit,
-        durationDays: subRow.plan.durationDays,
-        extraDevicePriceKopecks: subRow.plan.extraDevicePriceKopecks,
-        expireAt: deviceAddonExpireAt.toISOString(),
-      }
-    : null
-  return (
-    <div className={cn('user-workspace', styles.page)}>
-      <HomeHeader name={dashboardDisplayName(user.name, user.email)} />
-
-      <div className={styles.highlights}>
-        {whitelistAddonOffer ? (
-          <HomeWhitelistAddon {...whitelistAddonOffer} paymentProviders={paymentProviders} />
-        ) : whitelistPlan ? <HomeWhitelistPlans planId={whitelistPlan.id} /> : null}
-        {features.bonusBox ? (
-          <Suspense fallback={<LoadingPanel label="Загрузка рулетки" />}>
-            <HomeBonusBox userId={session.uid} referralsEnabled={features.referrals} />
-          </Suspense>
-        ) : null}
-      </div>
-
-      {remnawaveErrorStatus !== null && (
+  const deviceAddonOffer = buildDeviceAddonOffer({
+    subscription: subRow,
+    usable: subscriptionState.usable,
+    expireAt: sub?.expiresAt ? new Date(sub.expiresAt) : subRow?.expireAt ?? null,
+  })
+  const v2 = features.newDesign
+  const highlights = (
+    <div className={styles.highlights}>
+      {whitelistAddonOffer ? (
+        <HomeWhitelistAddon {...whitelistAddonOffer} paymentProviders={paymentProviders} />
+      ) : whitelistPlan ? <HomeWhitelistPlans planId={whitelistPlan.id} /> : null}
+      {features.bonusBox ? (
+        <Suspense fallback={<LoadingPanel label="Загрузка рулетки" />}>
+          <HomeBonusBox userId={session.uid} referralsEnabled={features.referrals} />
+        </Suspense>
+      ) : null}
+    </div>
+  )
+  const remnawaveNotice = remnawaveErrorStatus !== null && (
         <div className="flex flex-col gap-3 rounded-2xl border border-amber-200/80 bg-amber-50/80 px-4 py-3.5 text-sm text-amber-900 shadow-sm dark:border-amber-500/25 dark:bg-amber-500/[0.08] dark:text-amber-100 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-start gap-3">
             <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
@@ -283,82 +250,116 @@ export default async function DashboardHome() {
             Обновить
           </Link>
         </div>
-      )}
-
-      <div className={styles.overview}>
-        <section
-          className={cn(styles.access, subscriptionExpired && styles.expired)}
-          data-testid="subscription-overview"
-        >
-          <div className={styles.accessTop}>
-            <span className={styles.eyebrow}>Ваша подписка</span>
-            <StatusBadge status={subscriptionStatus} />
-          </div>
-          <div className={styles.accessContent}>
-            <h2 className={styles.planName}>{subRow?.plan?.name ?? 'VPN-подписка'}</h2>
-            <div className={styles.remainingLabel}>{unlimitedDuration ? 'Доступ' : 'Осталось'}</div>
-            <strong className={cn(styles.remaining, unlimitedDuration && styles.remainingUnlimited)}>
-              {unlimitedDuration
-                ? 'Бессрочно'
-                : subRow || sub
-                  ? subscriptionState.phase === 'paused'
-                    ? 'На паузе'
-                    : formatSubscriptionDaysLeft(daysLeft, subscriptionStatus)
-                  : 'Нет данных'}
-            </strong>
-            <p className={styles.accessDescription}>
-              {subscriptionState.remoteUnavailable
-                ? subscriptionState.description
-                : graceActive
-                ? `Льготный доступ до ${subRow?.graceExpireAt?.toLocaleString('ru-RU')}. Оплатите тариф, чтобы сохранить подключение.`
-                : subscriptionState.phase === 'paused' || subscriptionState.phase === 'syncing' || subscriptionExpired
-                  ? subscriptionState.description
-                  : unlimitedDuration
-                    ? 'Продление не требуется. Подключайте свои устройства и пользуйтесь VPN.'
-                    : expiresAtLabel
-                      ? `Оплачено до ${expiresAtLabel}`
-                      : 'Срок подписки пока недоступен.'}
-            </p>
-          </div>
-          <div className={styles.accessBottom}>
-            <Link href={primaryAction.href} className={styles.primaryAction}>
-              {primaryAction.icon}
-              <span>{primaryAction.label}</span>
-              <ArrowRight className="h-4 w-4 shrink-0" />
-            </Link>
-            <span className={styles.accessNote}>Одна подписка для ваших устройств</span>
-          </div>
-          <div className={styles.orbit} aria-hidden="true">
-            <div className={styles.orbitMiddle}><div className={styles.orbitCore}><ShieldCheck /></div></div>
-          </div>
-        </section>
-
-        <div className={styles.metrics}>
-          <Link href="/dashboard/devices" className={styles.metric}>
-            <div className={styles.metricTop}>
-              <span className={styles.metricIcon}><MonitorSmartphone className="h-5 w-5" /></span>
-              <ArrowRight className="h-4 w-4" />
-            </div>
-            <span className={styles.metricLabel}>Мои устройства</span>
-            <strong className={styles.metricValue}>
-              {user._count.devices}
-              <span>{subRow?.plan?.unlimitedDevices ? ' / ∞' : currentDeviceLimit ? ` / ${currentDeviceLimit}` : ' подключено'}</span>
-            </strong>
-            <span className={styles.metricHint}>Посмотреть и управлять</span>
-          </Link>
-          <Link href="/dashboard/billing#auto-renewal" className={styles.metric}>
-            <div className={styles.metricTop}>
-              <span className={styles.metricIcon}><CalendarDays className="h-5 w-5" /></span>
-              <ArrowRight className="h-4 w-4" />
-            </div>
-            <span className={styles.metricLabel}>{unlimitedDuration ? 'Срок подписки' : 'Оплачено до'}</span>
-            <strong className={styles.metricDate}>{expiresAtLabel ?? 'Нет данных'}</strong>
-            <span className={styles.metricHint}>Автопродление и платежи</span>
-          </Link>
+      )
+  const overview = (
+    <div className={styles.overview}>
+      <section
+        className={cn(styles.access, subscriptionExpired && styles.expired)}
+        data-testid="subscription-overview"
+      >
+        <div className={styles.accessTop}>
+          <span className={styles.eyebrow}>Ваша подписка</span>
+          <StatusBadge status={subscriptionStatus} />
         </div>
-      </div>
+        <div className={styles.accessContent}>
+          <h2 className={styles.planName}>{subRow?.plan?.name ?? 'VPN-подписка'}</h2>
+          <div className={styles.remainingLabel}>{unlimitedDuration ? 'Доступ' : 'Осталось'}</div>
+          <strong className={cn(styles.remaining, unlimitedDuration && styles.remainingUnlimited)}>
+            {unlimitedDuration
+              ? 'Бессрочно'
+              : subRow || sub
+                ? subscriptionState.phase === 'paused'
+                  ? 'На паузе'
+                  : formatSubscriptionDaysLeft(daysLeft, subscriptionStatus)
+                : 'Нет данных'}
+          </strong>
+          <p className={styles.accessDescription}>
+            {subscriptionState.remoteUnavailable
+              ? subscriptionState.description
+              : graceActive
+              ? `Льготный доступ до ${subRow?.graceExpireAt?.toLocaleString('ru-RU')}. Оплатите тариф, чтобы сохранить подключение.`
+              : subscriptionState.phase === 'paused' || subscriptionState.phase === 'syncing' || subscriptionExpired
+                ? subscriptionState.description
+                : unlimitedDuration
+                  ? 'Продление не требуется. Подключайте свои устройства и пользуйтесь VPN.'
+                  : expiresAtLabel
+                    ? `Оплачено до ${expiresAtLabel}`
+                    : 'Срок подписки пока недоступен.'}
+          </p>
+        </div>
+        <div className={styles.accessBottom}>
+          <Link href={primaryAction.href} className={styles.primaryAction}>
+            {primaryAction.icon}
+            <span>{primaryAction.label}</span>
+            <ArrowRight className="h-4 w-4 shrink-0" />
+          </Link>
+          <span className={styles.accessNote}>Одна подписка для ваших устройств</span>
+        </div>
+        <div className={styles.orbit} aria-hidden="true">
+          <div className={styles.orbitMiddle}><div className={styles.orbitCore}><ShieldCheck /></div></div>
+        </div>
+      </section>
 
-      {user.payments[0] ? <PendingPaymentCard payment={user.payments[0]} /> : null}
+      <div className={styles.metrics}>
+        <Link href={v2 ? '/dashboard/subscription#devices' : '/dashboard/devices'} className={styles.metric}>
+          <div className={styles.metricTop}>
+            <span className={styles.metricIcon}><MonitorSmartphone className="h-5 w-5" /></span>
+            <ArrowRight className="h-4 w-4" />
+          </div>
+          <span className={styles.metricLabel}>Мои устройства</span>
+          <strong className={styles.metricValue}>
+            {user._count.devices}
+            <span>{subRow?.plan?.unlimitedDevices ? ' / ∞' : currentDeviceLimit ? ` / ${currentDeviceLimit}` : ' подключено'}</span>
+          </strong>
+          <span className={styles.metricHint}>Посмотреть и управлять</span>
+        </Link>
+        <Link href={v2 ? '/dashboard/billing' : '/dashboard/billing#auto-renewal'} className={styles.metric}>
+          <div className={styles.metricTop}>
+            <span className={styles.metricIcon}><CalendarDays className="h-5 w-5" /></span>
+            <ArrowRight className="h-4 w-4" />
+          </div>
+          <span className={styles.metricLabel}>{unlimitedDuration ? 'Срок подписки' : 'Оплачено до'}</span>
+          <strong className={styles.metricDate}>{expiresAtLabel ?? 'Нет данных'}</strong>
+          <span className={styles.metricHint}>Автопродление и платежи</span>
+        </Link>
+      </div>
+    </div>
+  )
+  const pendingPayment = user.payments[0] ? <PendingPaymentCard payment={user.payments[0]} /> : null
+
+  if (v2) {
+    // Новый дизайн: сначала статус и одно действие, затем одно предложение и строка бонусов.
+    return (
+      <div className={cn('user-workspace', styles.page)} data-design="v2">
+        <HomeHeader name={dashboardDisplayName(user.name, user.email)} />
+        {pendingPayment}
+        {remnawaveNotice}
+        {overview}
+        {whitelistAddonOffer ? (
+          <HomeWhitelistAddon {...whitelistAddonOffer} paymentProviders={paymentProviders} />
+        ) : deviceAddonOffer ? (
+          <HomeDeviceAddon {...deviceAddonOffer} paymentProviders={paymentProviders} />
+        ) : whitelistPlan ? <HomeWhitelistPlans planId={whitelistPlan.id} /> : null}
+        {features.bonusBox ? (
+          <Suspense fallback={null}>
+            <HomeBonusTeaser userId={session.uid} />
+          </Suspense>
+        ) : null}
+      </div>
+    )
+  }
+
+  return (
+    <div className={cn('user-workspace', styles.page)}>
+      <HomeHeader name={dashboardDisplayName(user.name, user.email)} />
+
+      {highlights}
+
+      {remnawaveNotice}
+
+      {overview}
+
+      {pendingPayment}
 
       <HomeActions supportEnabled={features.support} hasSubscription />
 
@@ -391,6 +392,33 @@ async function HomeBonusBox({ userId, referralsEnabled }: { userId: string; refe
     )
   }
   return <BonusBoxClientDynamic initialData={data} compact referralsEnabled={referralsEnabled} />
+}
+
+async function HomeBonusTeaser({ userId }: { userId: string }) {
+  const attempts = await countAvailableBonusBoxAttempts(userId).catch(() => 0)
+  if (attempts <= 0) return null
+  return (
+    <section aria-label="Бонусы" className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 dark:border-white/10 dark:bg-white/[0.03]">
+      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-700 dark:bg-brand-400/10 dark:text-brand-200">
+        <Gift className="h-5 w-5" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <h2 className="text-sm font-semibold text-slate-950 dark:text-white">У вас {attempts} {pluralizeAttempts(attempts)}</h2>
+        <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Крутите рулетку и забирайте призы</p>
+      </div>
+      <Link href="/dashboard/bonus-box" className="btn-primary shrink-0">
+        Крутить
+      </Link>
+    </section>
+  )
+}
+
+function pluralizeAttempts(count: number) {
+  const mod10 = count % 10
+  const mod100 = count % 100
+  if (mod10 === 1 && mod100 !== 11) return 'попытка'
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return 'попытки'
+  return 'попыток'
 }
 
 function HomeWhitelistPlans({ planId }: { planId: string }) {

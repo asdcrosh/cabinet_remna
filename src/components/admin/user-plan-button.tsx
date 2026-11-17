@@ -23,17 +23,22 @@ export function UserPlanButton({
   currentPlanId,
   plans,
   showLabel = false,
+  label = 'Назначить тариф',
+  primary = false,
 }: {
   userId: string
   email: string
   currentPlanId: string | null
   plans: UserPlanOption[]
   showLabel?: boolean
+  label?: string
+  primary?: boolean
 }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [planId, setPlanId] = useState(currentPlanId ?? plans[0]?.id ?? '')
-  const [mode, setMode] = useState<'REPLACE' | 'EXTEND'>('REPLACE')
+  // По умолчанию срок добавляется к текущему: перезапись подписки — осознанный выбор.
+  const [mode, setMode] = useState<'REPLACE' | 'EXTEND'>('EXTEND')
   const [loading, setLoading] = useState(false)
   const [query, setQuery] = useState('')
   const [serverError, setServerError] = useState<string | null>(null)
@@ -70,19 +75,19 @@ export function UserPlanButton({
     <>
       <button
         type="button"
-        className={`btn-secondary h-10 min-h-10 shrink-0 hover:text-emerald-700 dark:hover:text-emerald-300 ${showLabel ? 'px-3' : 'w-10 px-0'}`}
+        className={`${primary ? 'btn-primary' : 'btn-secondary hover:text-emerald-700 dark:hover:text-emerald-300'} h-10 min-h-10 shrink-0 ${showLabel ? 'px-3' : 'w-10 px-0'}`}
         onClick={() => setOpen(true)}
-        title="Назначить тариф"
-        aria-label="Назначить тариф"
+        title={label}
+        aria-label={label}
       >
         <CalendarPlus className="h-4 w-4" />
-        {showLabel ? <span>Назначить тариф</span> : null}
+        {showLabel ? <span>{label}</span> : null}
       </button>
 
       <AdminModal
         open={open}
         onClose={() => !loading && setOpen(false)}
-        title="Назначить тариф"
+        title={label}
         description={email}
         size="md"
       >
@@ -127,11 +132,11 @@ export function UserPlanButton({
           </fieldset>
 
           <div className="grid gap-2 rounded-xl bg-slate-50 p-1 dark:bg-white/5 sm:grid-cols-2">
-            <button type="button" aria-pressed={mode === 'REPLACE'} className={mode === 'REPLACE' ? 'btn-primary' : 'btn-secondary'} onClick={() => setMode('REPLACE')}>
-              Выдать заново
-            </button>
             <button type="button" aria-pressed={mode === 'EXTEND'} className={mode === 'EXTEND' ? 'btn-primary' : 'btn-secondary'} onClick={() => setMode('EXTEND')}>
               Добавить дни
+            </button>
+            <button type="button" aria-pressed={mode === 'REPLACE'} className={mode === 'REPLACE' ? 'btn-primary' : 'btn-secondary'} onClick={() => setMode('REPLACE')}>
+              Выдать заново
             </button>
           </div>
           <p className="text-sm text-slate-500">

@@ -24,8 +24,10 @@ export default async function globalSetup() {
   try {
     await prisma.featureSetting.upsert({
       where: { id: 'default' },
-      create: { id: 'default', referrals: true, bonusBox: true, support: true, broadcasts: true },
-      update: { referrals: true, bonusBox: true, support: true, broadcasts: true },
+      // Основной набор сценариев проверяет прежний дизайн, к которому админ может вернуться.
+      // Новый дизайн включается в new-design.e2e.ts на время своих проверок.
+      create: { id: 'default', referrals: true, bonusBox: true, support: true, broadcasts: true, newDesign: false },
+      update: { referrals: true, bonusBox: true, support: true, broadcasts: true, newDesign: false },
     })
     await prisma.rateLimitBucket.deleteMany({
       where: {

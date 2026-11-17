@@ -41,6 +41,7 @@ type AdminRouteCase = {
 }
 
 const routeCases: AdminRouteCase[] = [
+  { name: 'global search', module: './search/route', method: 'GET' },
   { name: 'feature settings read', module: './system/features/route', method: 'GET' },
   { name: 'feature settings update', module: './system/features/route', method: 'PATCH' },
   { name: 'referral settings read', module: './referrals/settings/route', method: 'GET' },

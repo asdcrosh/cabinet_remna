@@ -24,6 +24,7 @@ const features = {
   bonusBox: false,
   support: true,
   broadcasts: false,
+  newDesign: true,
 }
 
 describe('admin feature settings route', () => {
@@ -54,6 +55,33 @@ describe('admin feature settings route', () => {
       action: 'ADMIN_FEATURES_UPDATED',
       metadata: features,
     }))
+  })
+
+  it('keeps the current design when an older admin tab omits the design switch', async () => {
+    const { newDesign: _omitted, ...withoutDesign } = features
+    void _omitted
+    mocks.getFeatureFlags.mockResolvedValue({ ...features, newDesign: false })
+    const request = new Request('https://cabinet.example/api/admin/system/features', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(withoutDesign),
+    })
+    const response = await PATCH(request)
+
+    expect(response.status).toBe(200)
+    expect(mocks.updateFeatureFlags).toHaveBeenCalledWith({ ...withoutDesign, newDesign: false })
+  })
+
+  it('switches everyone to the previous design', async () => {
+    const request = new Request('https://cabinet.example/api/admin/system/features', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...features, newDesign: false }),
+    })
+    const response = await PATCH(request)
+
+    expect(response.status).toBe(200)
+    expect(mocks.updateFeatureFlags).toHaveBeenCalledWith({ ...features, newDesign: false })
   })
 
   it('rejects incomplete settings', async () => {

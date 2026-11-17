@@ -3556,3 +3556,14 @@ html:not(.dark) .bonus-wheel-result-modal .bonus-wheel-result-promo small {
     width: 100%;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Новый дизайн (features.newDesign): тише заголовки, без надстрочников капсом.
+   Старый дизайн эти правила не затрагивают — они срабатывают только внутри
+   .dashboard-shell[data-design="v2"].
+   --------------------------------------------------------------------------- */
+.dashboard-shell[data-design="v2"] .page-eyebrow,
+.dashboard-shell[data-design="v2"] .admin-page-heading__eyebrow,
+.dashboard-shell[data-design="v2"] .admin-page-hero__eyebrow {
+  display: none;
+}

@@ -124,6 +124,7 @@ export function SupportPanel({
   initialCategory = 'connection',
   initialMessage = '',
   initialNewTicketOpen = false,
+  userTitle = 'Поддержка',
 }: SupportPanelProps) {
   const messagesScrollRef = useRef<HTMLDivElement | null>(null)
   const loadMoreRef = useRef<HTMLDivElement | null>(null)
@@ -874,7 +875,7 @@ export function SupportPanel({
                     <Headphones className="h-[18px] w-[18px]" />
                   </span>
                   <div className="min-w-0 flex-1">
-                    <h1 className="truncate text-base font-semibold tracking-[-0.025em] text-slate-950 dark:text-white">Поддержка</h1>
+                    <h1 className="truncate text-base font-semibold tracking-[-0.025em] text-slate-950 dark:text-white">{userTitle}</h1>
                     <p className="mt-0.5 flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
                       <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Ответим в этом чате
                     </p>

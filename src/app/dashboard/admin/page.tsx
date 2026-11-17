@@ -24,6 +24,7 @@ import { findIdentityDuplicateCandidates } from '@/lib/identity-duplicates'
 import { logError } from '@/lib/logger'
 import { AdminPageShell } from '@/components/admin/admin-page-shell'
 import { AdminQuickSearch } from '@/components/admin/admin-quick-search'
+import { getFeatureFlags } from '@/lib/feature-flags'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Админка' }
@@ -139,10 +140,62 @@ export default async function AdminDashboardPage() {
     minute: '2-digit',
   })
 
+  const newDesign = (await getFeatureFlags()).newDesign
+  const attention = (
+    <section className="relative overflow-hidden rounded-[1.5rem] border border-amber-200/80 bg-gradient-to-br from-amber-50 via-white to-orange-50/60 p-4 shadow-[0_12px_35px_-24px_rgba(217,119,6,0.45)] dark:border-amber-400/15 dark:from-amber-500/[0.09] dark:via-white/[0.025] dark:to-orange-500/[0.05] sm:p-5">
+      <div className="pointer-events-none absolute -right-16 -top-20 h-44 w-44 rounded-full bg-amber-300/20 blur-3xl dark:bg-amber-400/10" />
+      <div className="relative flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-400/15 text-amber-700 ring-1 ring-amber-500/20 dark:text-amber-200">
+              <TriangleAlert className="h-4 w-4" />
+            </span>
+            <h2 className="text-lg font-semibold tracking-tight text-slate-950 dark:text-white">Требует внимания</h2>
+          </div>
+          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">Очереди для ручной проверки</p>
+        </div>
+        <span className="rounded-full border border-amber-300/70 bg-amber-100/80 px-2.5 py-1 text-xs font-medium text-amber-800 dark:border-amber-300/15 dark:bg-amber-300/10 dark:text-amber-200">
+          {supportWaiting + recoveryCount + overdueProvisioningJobs + syncFailed + duplicateCandidates.length + stalePendingPayments} сигналов
+        </span>
+      </div>
+      <div className="relative mt-4 grid gap-2.5 sm:grid-cols-2 min-[1360px]:grid-cols-3 2xl:grid-cols-5">
+        {supportWaiting > 0 && (
+          <PriorityCard href="/dashboard/admin/support" icon={<LifeBuoy className="h-4 w-4" />} title="Поддержка" value={supportWaiting} text="Обращения без ответа" />
+        )}
+        {recoveryCount > 0 && (
+          <PriorityCard href="/dashboard/admin/recovery" icon={<Database className="h-4 w-4" />} title="Оплачено без доступа" value={recoveryCount} text="Нужна довыдача подписки" />
+        )}
+        {overdueProvisioningJobs > 0 && (
+          <PriorityCard href="/dashboard/admin/recovery" icon={<TimerReset className="h-4 w-4" />} title="Просроченные задачи" value={overdueProvisioningJobs} text="Повтор уже должен был начаться" />
+        )}
+        {syncFailed > 0 && (
+          <PriorityCard href="/dashboard/admin/remnashop-sync" icon={<RefreshCw className="h-4 w-4" />} title="Синхронизация" value={syncFailed} text="Необработанные ошибки" />
+        )}
+        {duplicateCandidates.length > 0 && (
+          <PriorityCard href="/dashboard/admin/duplicates" icon={<SearchCheck className="h-4 w-4" />} title="Дубли" value={duplicateCandidates.length} text="Нужна ручная проверка" />
+        )}
+        {stalePendingPayments > 0 && (
+          <PriorityCard href="/dashboard/admin/payments?status=PENDING" icon={<FileClock className="h-4 w-4" />} title="Оплаты" value={stalePendingPayments} text="Зависли в ожидании" />
+        )}
+        {supportWaiting === 0 && recoveryCount === 0 && overdueProvisioningJobs === 0 && syncFailed === 0 && duplicateCandidates.length === 0 && stalePendingPayments === 0 && (
+          <div className="col-span-full flex min-h-20 items-center gap-3 rounded-[1.15rem] border border-emerald-200/80 bg-emerald-50/80 px-4 py-3 text-sm font-medium text-emerald-800 shadow-sm dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/10 ring-1 ring-emerald-500/15">
+              <ShieldCheck className="h-5 w-5 text-emerald-600 dark:text-emerald-300" />
+            </span>
+            <div>
+              <div className="font-semibold">Очереди чистые</div>
+              <div className="mt-0.5 text-xs font-normal text-emerald-700/80 dark:text-emerald-300/80">Срочных действий нет</div>
+            </div>
+          </div>
+        )}
+      </div>
+    </section>
+  )
+
   return (
     <AdminPageShell
-      title="Обзор"
-      description="Показатели и задачи кабинета"
+      title={newDesign ? 'Сегодня' : 'Обзор'}
+      description={newDesign ? 'Что требует действия и главные цифры дня' : 'Показатели и задачи кабинета'}
       action={(
         <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/80 px-3 py-1.5 text-xs text-slate-500 shadow-sm dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-300">
           <span className="relative flex h-2 w-2">
@@ -162,55 +215,17 @@ export default async function AdminDashboardPage() {
           </div>
         </section>
       ) : null}
-      <AdminQuickSearch />
-      <section className="relative overflow-hidden rounded-[1.5rem] border border-amber-200/80 bg-gradient-to-br from-amber-50 via-white to-orange-50/60 p-4 shadow-[0_12px_35px_-24px_rgba(217,119,6,0.45)] dark:border-amber-400/15 dark:from-amber-500/[0.09] dark:via-white/[0.025] dark:to-orange-500/[0.05] sm:p-5">
-        <div className="pointer-events-none absolute -right-16 -top-20 h-44 w-44 rounded-full bg-amber-300/20 blur-3xl dark:bg-amber-400/10" />
-        <div className="relative flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-400/15 text-amber-700 ring-1 ring-amber-500/20 dark:text-amber-200">
-                <TriangleAlert className="h-4 w-4" />
-              </span>
-              <h2 className="text-lg font-semibold tracking-tight text-slate-950 dark:text-white">Требует внимания</h2>
-            </div>
-            <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">Очереди для ручной проверки</p>
-          </div>
-          <span className="rounded-full border border-amber-300/70 bg-amber-100/80 px-2.5 py-1 text-xs font-medium text-amber-800 dark:border-amber-300/15 dark:bg-amber-300/10 dark:text-amber-200">
-            {supportWaiting + recoveryCount + overdueProvisioningJobs + syncFailed + duplicateCandidates.length + stalePendingPayments} сигналов
-          </span>
-        </div>
-        <div className="relative mt-4 grid gap-2.5 sm:grid-cols-2 min-[1360px]:grid-cols-3 2xl:grid-cols-5">
-          {supportWaiting > 0 && (
-            <PriorityCard href="/dashboard/admin/support" icon={<LifeBuoy className="h-4 w-4" />} title="Поддержка" value={supportWaiting} text="Обращения без ответа" />
-          )}
-          {recoveryCount > 0 && (
-            <PriorityCard href="/dashboard/admin/recovery" icon={<Database className="h-4 w-4" />} title="Оплачено без доступа" value={recoveryCount} text="Нужна довыдача подписки" />
-          )}
-          {overdueProvisioningJobs > 0 && (
-            <PriorityCard href="/dashboard/admin/recovery" icon={<TimerReset className="h-4 w-4" />} title="Просроченные задачи" value={overdueProvisioningJobs} text="Повтор уже должен был начаться" />
-          )}
-          {syncFailed > 0 && (
-            <PriorityCard href="/dashboard/admin/remnashop-sync" icon={<RefreshCw className="h-4 w-4" />} title="Синхронизация" value={syncFailed} text="Необработанные ошибки" />
-          )}
-          {duplicateCandidates.length > 0 && (
-            <PriorityCard href="/dashboard/admin/duplicates" icon={<SearchCheck className="h-4 w-4" />} title="Дубли" value={duplicateCandidates.length} text="Нужна ручная проверка" />
-          )}
-          {stalePendingPayments > 0 && (
-            <PriorityCard href="/dashboard/admin/payments?status=PENDING" icon={<FileClock className="h-4 w-4" />} title="Оплаты" value={stalePendingPayments} text="Зависли в ожидании" />
-          )}
-          {supportWaiting === 0 && recoveryCount === 0 && overdueProvisioningJobs === 0 && syncFailed === 0 && duplicateCandidates.length === 0 && stalePendingPayments === 0 && (
-            <div className="col-span-full flex min-h-20 items-center gap-3 rounded-[1.15rem] border border-emerald-200/80 bg-emerald-50/80 px-4 py-3 text-sm font-medium text-emerald-800 shadow-sm dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/10 ring-1 ring-emerald-500/15">
-                <ShieldCheck className="h-5 w-5 text-emerald-600 dark:text-emerald-300" />
-              </span>
-              <div>
-                <div className="font-semibold">Очереди чистые</div>
-                <div className="mt-0.5 text-xs font-normal text-emerald-700/80 dark:text-emerald-300/80">Срочных действий нет</div>
-              </div>
-            </div>
-          )}
-        </div>
-      </section>
+      {newDesign ? (
+        <>
+          {attention}
+          <div className="xl:hidden"><AdminQuickSearch /></div>
+        </>
+      ) : (
+        <>
+          <AdminQuickSearch />
+          {attention}
+        </>
+      )}
 
       <section className="space-y-4">
         <div className="flex flex-wrap items-end justify-between gap-2">

@@ -10,6 +10,9 @@ import { Brand, DashboardNav, MobileBottomNav, NavBadgesProvider } from '@/compo
 import { NotificationBell } from '@/components/dashboard/notification-bell'
 import { logWarn } from '@/lib/logger'
 import { AdminErrorCenter } from '@/components/admin/admin-error-center'
+import { AdminSidebarSearch } from '@/components/admin/admin-sidebar-search'
+import { MobileTabBarV2, MobileTopBarV2, SidebarNavV2 } from '@/components/dashboard/dashboard-nav-v2'
+import { countAvailableBonusBoxAttempts } from '@/lib/bonus-box-attempts'
 
 export const dynamic = 'force-dynamic'
 
@@ -57,6 +60,58 @@ export default async function DashboardLayout({ children }: { children: React.Re
     '/dashboard/admin/support': adminSupportUnreadCount._sum.adminUnreadCount ?? 0,
     '/dashboard/notifications': notificationUnreadCount,
     '/dashboard/admin/notifications': adminNotificationUnreadCount,
+  }
+  if (features.newDesign) {
+    const bonusAttempts = features.bonusBox
+      ? await countAvailableBonusBoxAttempts(session.uid).catch(() => 0)
+      : 0
+    const bell = (
+      <NotificationBell
+        showAdmin={isStaff}
+        initialUserUnreadCount={notificationUnreadCount}
+        initialAdminUnreadCount={adminNotificationUnreadCount}
+      />
+    )
+    return (
+      <NavBadgesProvider initialBadges={navBadges} supportEnabled={features.support} showAdmin={isStaff}>
+        {isStaff ? <AdminErrorCenter /> : null}
+        <div className="dashboard-shell min-h-screen pt-[var(--telegram-miniapp-safe-top)] xl:pt-0" data-design="v2">
+          <a
+            href="#dashboard-content"
+            className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[200] focus:rounded-lg focus:bg-slate-950 focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-white"
+          >
+            Перейти к содержимому
+          </a>
+          <aside className="dashboard-sidebar fixed inset-y-0 left-0 z-40 hidden h-dvh w-64 flex-col overflow-hidden border-r xl:flex">
+            <div className="shrink-0 px-5 pb-5 pt-5">
+              <Brand brandName={brandName} />
+            </div>
+            <div className="dashboard-sidebar-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-4">
+              <SidebarNavV2
+                role={role}
+                badges={navBadges}
+                features={features}
+                adminSearch={isStaff ? <AdminSidebarSearch role={role} features={features} /> : null}
+              />
+            </div>
+            <div className="shrink-0 border-t border-slate-200 p-3 dark:border-white/[0.08]">
+              <div className="mb-1 px-3 py-2 text-xs text-slate-500">
+                <div className="truncate font-medium text-slate-700 dark:text-slate-200">{accountLabel}</div>
+                <div>{roleLabel(role)}</div>
+              </div>
+              <LogoutButton />
+            </div>
+          </aside>
+          <main className="dashboard-main min-w-0 w-full overflow-x-clip xl:ml-64 xl:w-auto">
+            <MobileTopBarV2 brandName={brandName} showBonus={features.bonusBox} bonusAttempts={bonusAttempts} bell={bell} />
+            <div className="dashboard-content-frame mx-auto w-full max-w-[92rem] min-w-0 px-4 pb-28 pt-5 sm:px-7 sm:pt-7 xl:px-9 xl:pb-14 xl:pt-2">
+              <div id="dashboard-content" className="page-transition min-w-0 scroll-mt-20">{children}</div>
+            </div>
+          </main>
+          <MobileTabBarV2 role={role} badges={navBadges} features={features} />
+        </div>
+      </NavBadgesProvider>
+    )
   }
   return (
     <NavBadgesProvider initialBadges={navBadges} supportEnabled={features.support} showAdmin={isStaff}>
