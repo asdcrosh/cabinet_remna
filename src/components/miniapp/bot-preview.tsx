@@ -1,13 +1,13 @@
 'use client'
 import { useState } from 'react'
-import { buildDeviceDeleteConfirm, buildDeviceScreen, buildRichPaymentScreen, buildRichScreen, botScreens, type BotScreen } from '@/lib/miniapp/rich-screens'
+import { buildDeviceDeleteConfirm, buildDeviceScreen, buildRichPaymentScreen, buildRichScreen, botScreens, type BotPaymentQuote, type BotScreen } from '@/lib/miniapp/rich-screens'
 import { miniAppDemo } from '@/lib/miniapp/model'
 import './bot-preview.css'
 
 type View = 'screen' | 'payment' | 'device' | 'confirm'
 const demoDevice = { id: 'demo-dev-1', title: 'iPhone', platform: 'iOS · Rabbit Hole' }
 
-export function BotPreview({ brandName, bannerUrl }: { brandName: string; bannerUrl?: string }) {
+export function BotPreview({ brandName, bannerUrl, paymentQuote }: { brandName: string; bannerUrl?: string; paymentQuote: BotPaymentQuote | null }) {
   const [screen, setScreen] = useState<BotScreen>('home')
   const [view, setView] = useState<View>('screen')
   const [notice, setNotice] = useState('')
@@ -21,7 +21,7 @@ export function BotPreview({ brandName, bannerUrl }: { brandName: string; banner
     prefs: { telegram: true, email: true, broadcasts: false },
     referral: { url: 'https://example.test/miniapp?ref=DEMO01', condition: 'Новый пользователь приходит по приглашению и вступает в канал. Канал и количество бонусных дней ещё не настроены.', invited: 3, claimed: 1, channelUrl: null, eligible: false, ownClaimed: false }, notice,
   }
-  const html = view === 'payment' ? buildRichPaymentScreen(input, miniAppDemo.plans[0]?.id ?? 'demo', null)
+  const html = view === 'payment' ? buildRichPaymentScreen(input, miniAppDemo.plans[0]?.id ?? 'demo', null, null, paymentQuote)
     : view === 'device' ? buildDeviceScreen(input, demoDevice)
     : view === 'confirm' ? buildDeviceDeleteConfirm(input, demoDevice)
     : buildRichScreen(input)
