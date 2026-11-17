@@ -115,6 +115,9 @@
 .roulette :global(.bonus-box-stage-header) { padding: 10px 13px; }
 .roulette :global(.bonus-roulette-console) { border-left: 0; border-top: 1px solid var(--line); }
 .roulette :global(.bonus-roulette-theater) { padding-top: 1.25rem; }
+.roulette :global(.bonus-roulette-controls--mobile) { display: block; width: 100%; margin: 0; padding: 12px 13px 0; }
+.roulette :global(.bonus-roulette-controls--desktop),
+.roulette :global(.bonus-roulette-console-head .bonus-wheel-sound-toggle) { display: none; }
 .notif { display: flex; align-items: center; gap: 14px; width: 100%; margin: 10px 0; padding: 16px 18px; border: 1px solid var(--line); border-radius: 14px; background: #20162f; color: var(--ink); text-align: left; cursor: pointer; transition: background-color .2s, transform .2s; }
 .notif:hover { background: #2a1c3e; }
 .notif:active { transform: scale(.99); }
