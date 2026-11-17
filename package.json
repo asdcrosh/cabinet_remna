@@ -23,7 +23,7 @@
     "worker:watch": "tsx scripts/watch-worker.ts",
     "worker:node-provisioning": "tsx scripts/node-provisioning-worker.ts",
     "cleanup:retention": "tsx scripts/cleanup-retention.ts",
-    "postinstall": "prisma generate",
+    "postinstall": "node scripts/backport-picomatch.mjs && prisma generate",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",

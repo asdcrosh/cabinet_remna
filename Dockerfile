@@ -4,6 +4,7 @@ WORKDIR /app
 RUN apk add --no-cache openssl
 COPY package.json package-lock.json ./
 COPY prisma ./prisma
+COPY scripts/backport-picomatch.mjs ./scripts/
 RUN npm ci
 
 FROM deps AS prisma-cli

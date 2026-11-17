@@ -70,3 +70,51 @@ describe('dependency audit gate', () => {
     expect(() => evaluateAudit({ error: { code: 'ENETUNREACH' } }, lock, now)).toThrow()
   })
 })
+
+describe('Picomatch backport in the dependency audit', () => {
+  const advisory = 'https://github.com/advisories/GHSA-fc5q-39xc-vjpf'
+  const paths = ['node_modules/picomatch', 'node_modules/vite/node_modules/picomatch']
+  const fixture = () => ({
+    report: {
+      auditReportVersion: 2,
+      vulnerabilities: {
+        picomatch: {
+          severity: 'high', nodes: paths, via: [{ severity: 'high', url: advisory }],
+        },
+        vite: {
+          severity: 'high', nodes: ['node_modules/vite'], via: ['picomatch'],
+        },
+      },
+    },
+    lock: { packages: {
+      'node_modules/picomatch': { version: '2.3.2', dev: false },
+      'node_modules/vite/node_modules/picomatch': { version: '4.0.7', dev: true },
+      'node_modules/vite': { version: '8.3.5', dev: true },
+    } },
+  })
+
+  it('requires every reported installation to match the backported source', () => {
+    const { report, lock } = fixture()
+    expect(evaluateAudit(report, lock, now, new Set([paths[0]])).blocked).toEqual(['picomatch', 'vite'])
+    expect(evaluateAudit(report, lock, now, new Set(paths))).toEqual({
+      blocked: [], exempted: ['picomatch', 'vite'],
+    })
+  })
+
+  it('resolves a peer-dependency cycle only when its nodes lead to a covered advisory', () => {
+    const { report, lock } = fixture()
+    report.vulnerabilities.coverage = { severity: 'high', nodes: ['node_modules/coverage'], via: ['vite'] }
+    lock.packages['node_modules/coverage'] = { version: '1.0.0', dev: true }
+    report.vulnerabilities.vite.via.push('coverage')
+    expect(evaluateAudit(report, lock, now, new Set(paths)).blocked).toEqual([])
+
+    report.vulnerabilities.coverage.via = ['coverage']
+    expect(evaluateAudit(report, lock, now, new Set(paths)).blocked).toEqual(['vite', 'coverage'])
+  })
+
+  it('still blocks an additional advisory on the same package', () => {
+    const { report, lock } = fixture()
+    report.vulnerabilities.picomatch.via.push({ severity: 'high', url: 'https://github.com/advisories/another' })
+    expect(evaluateAudit(report, lock, now, new Set(paths)).blocked).toEqual(['picomatch', 'vite'])
+  })
+})
