@@ -11,6 +11,9 @@ import { getPublicBrandSettings } from '@/lib/branding'
 import { AdminSystemTabs } from '@/components/admin/admin-system-tabs'
 import { SupportSettingsPanel } from '@/components/admin/support-settings-panel'
 import { getSupportSettings } from '@/lib/support-settings'
+import Link from 'next/link'
+import { ArrowUpRight } from 'lucide-react'
+import { SUPPORT_SETTINGS_HREF } from '@/lib/support-settings-access'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Настройки' }
@@ -77,7 +80,11 @@ export default async function AdminSystemPage() {
           description: 'SLA и шаблоны',
           badge: `${supportSettings.quickReplies.length} шаблонов`,
           keywords: ['поддержка', 'sla', 'ответы', 'шаблоны', 'операторы'],
-          children: <SupportSettingsPanel initialSettings={supportSettings} />,
+          // Новый дизайн: шаблоны и SLA живут в самой Поддержке, здесь — короткая сводка и ссылка.
+          // Если Поддержка выключена, редактировать больше негде — оставляем прежнюю форму.
+          children: features.newDesign && features.support
+            ? <SupportSettingsMovedNotice quickRepliesCount={supportSettings.quickReplies.length} />
+            : <SupportSettingsPanel initialSettings={supportSettings} />,
         },
         {
           id: 'health',
@@ -90,5 +97,21 @@ export default async function AdminSystemPage() {
         },
       ]} />
     </AdminPageShell>
+  )
+}
+
+function SupportSettingsMovedNotice({ quickRepliesCount }: { quickRepliesCount: number }) {
+  return (
+    <section className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.025]">
+      <h2 className="text-lg font-semibold">Шаблоны и SLA — в Поддержке</h2>
+      <p className="mt-1 text-sm leading-6 text-slate-500">
+        Шаблоны ответов ({quickRepliesCount}) и пороги ожидания ответа настраиваются прямо в разделе «Поддержка»:
+        кнопкой «Шаблоны и SLA» в шапке или шестерёнкой рядом со списком шаблонов.
+      </p>
+      <Link href={SUPPORT_SETTINGS_HREF} className="btn-secondary mt-4 inline-flex">
+        Открыть шаблоны и SLA
+        <ArrowUpRight className="h-4 w-4" />
+      </Link>
+    </section>
   )
 }

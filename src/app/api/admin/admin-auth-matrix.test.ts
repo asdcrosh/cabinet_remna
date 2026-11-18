@@ -95,6 +95,9 @@ const routeCases: AdminRouteCase[] = [
   { name: 'manual sync', module: './sync/route', method: 'POST' },
   { name: 'system health read', module: './system/health/route', method: 'GET' },
   { name: 'system health email', module: './system/health/route', method: 'POST' },
+  // Шаблоны ответов и SLA теперь редактируются из «Поддержки», но права те же: только ADMIN и SUPER_ADMIN.
+  { name: 'support settings read', module: './system/support/route', method: 'GET' },
+  { name: 'support settings update', module: './system/support/route', method: 'PATCH' },
   { name: 'watch report', module: './watch/route', method: 'GET' },
   { name: 'watch manual cycle', module: './watch/route', method: 'POST' },
   { name: 'bonus attempts grant', module: './users/[id]/bonus-box-attempts/route', method: 'POST', params: { id: 'user-1' } },
