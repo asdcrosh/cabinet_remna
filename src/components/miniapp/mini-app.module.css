@@ -117,6 +117,20 @@
 .device + .device { border-top: 1px solid var(--app-border); }
 .device > svg:first-child { color: var(--app-accent); }
 .device > span { flex: 1; }
+
+/* Карточка тарифа из #51: цена сразу в заголовке, срок, устройства и трафик чипами. */
+.planHead { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.planHead > div { min-width: 0; }
+.planHead > strong { flex: none; color: var(--app-text); font-size: 22px; font-weight: 650; letter-spacing: -.035em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.plan .currentPlan { display: inline-block; color: var(--app-accent-text); font-size: 11px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; }
+.plan .planMeta { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 8px; }
+.planMeta span { padding: 3px 8px; border-radius: 8px; background: var(--app-surface-soft); color: var(--app-text); font-size: 12px; }
+.rate { margin: 0 0 4px; color: var(--app-muted); font-size: 13px; }
+.starsPrice { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; color: var(--app-muted); font-size: 13px; }
+.starsPrice strong { color: var(--app-text); font-size: 18px; font-weight: 650; white-space: nowrap; }
+.promo { margin-top: 8px; }
+.promo summary { width: fit-content; padding: 8px 0; color: var(--app-accent-text); font-size: 13px; font-weight: 600; cursor: pointer; }
+.promo[open] input { margin-top: 2px; }
 .device b, .device small { display: block; }
 .device small { color: var(--app-muted); font-size: 12px; }
 
@@ -164,6 +178,16 @@
 .notif { display: flex; width: 100%; align-items: center; gap: 14px; margin: 10px 0; padding: 14px 16px; border: 1px solid var(--app-border); border-radius: 14px; background: var(--app-surface); color: var(--app-text); text-align: left; cursor: pointer; transition: border-color .15s; }
 .notifUnread { border-color: color-mix(in srgb, var(--app-accent) 35%, var(--app-border)); background: color-mix(in srgb, var(--app-accent) 5%, var(--app-surface)); }
 .notifBody { flex: 1; min-width: 0; }
+
+/* Рулетка кабинета внутри Mini App (#51): одна колонка на узком экране. */
+.roulette { margin-top: 4px; }
+.roulette :global(.bonus-roulette-layout) { grid-template-columns: minmax(0, 1fr); min-height: 0; }
+.roulette :global(.bonus-box-stage-header) { padding: 10px 13px; }
+.roulette :global(.bonus-roulette-console) { border-left: 0; border-top: 1px solid var(--app-border); }
+.roulette :global(.bonus-roulette-theater) { padding-top: 1.25rem; }
+.roulette :global(.bonus-roulette-controls--mobile) { display: block; width: 100%; margin: 0; padding: 12px 13px 0; }
+.roulette :global(.bonus-roulette-controls--desktop),
+.roulette :global(.bonus-roulette-console-head .bonus-wheel-sound-toggle) { display: none; }
 .notifBody b, .notifBody small { display: block; }
 .notifBody b { font-size: 14px; font-weight: 600; line-height: 1.45; }
 .notifBody small { margin-top: 4px; color: var(--app-muted); font-size: 12px; line-height: 1.5; }
