@@ -59,12 +59,15 @@ import {
   appendReturnTo,
   buildAdminSupportPath,
   formatSupportTicketAge,
+  getSupportDraftKey,
   getSupportSlaState,
   getSupportTicketCursor,
   getUnreadCount,
   insertAtSelection,
   mergeSupportTicket,
   needsCurrentActor,
+  readSupportDraft,
+  saveSupportDraft,
   type SupportMessage,
   type SupportPanelProps,
   type SupportQueueCounts,
@@ -183,27 +186,23 @@ export function SupportPanel({
     : tickets.find((ticket) => ticket.id === selectedId) ?? null
 
   useEffect(() => {
-    const context = selectedId ? `support-draft:${mode}:${selectedId}` : null
+    const context = selectedId ? getSupportDraftKey(mode, selectedId) : null
     if (draftContextRef.current === context) return
     draftContextRef.current = context
     draftLoadedRef.current = false
-    setMessage(context ? window.localStorage.getItem(context) ?? '' : '')
+    setMessage(context ? readSupportDraft(window.localStorage, context) : '')
     setMessageFiles([])
     setFailedSend(null)
   }, [mode, selectedId])
 
   useEffect(() => {
-    const context = selectedId ? `support-draft:${mode}:${selectedId}` : null
+    const context = selectedId ? getSupportDraftKey(mode, selectedId) : null
     if (!context || draftContextRef.current !== context) return
     if (!draftLoadedRef.current) {
       draftLoadedRef.current = true
       return
     }
-    const timeout = window.setTimeout(() => {
-      if (message.trim()) window.localStorage.setItem(context, message)
-      else window.localStorage.removeItem(context)
-    }, 150)
-    return () => window.clearTimeout(timeout)
+    saveSupportDraft(window.localStorage, context, message)
   }, [message, mode, selectedId])
 
   const folderCounts = useMemo(
@@ -582,7 +581,7 @@ export function SupportPanel({
       setMessage('')
       setMessageFiles([])
       setSendingMessageId('')
-      window.localStorage.removeItem(`support-draft:${mode}:${selected.id}`)
+      window.localStorage.removeItem(getSupportDraftKey(mode, selected.id))
       advanceAdminQueueIfNeeded(updated)
     })
   }
