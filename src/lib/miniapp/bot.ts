@@ -1,4 +1,5 @@
 import { getBrandName } from '@/lib/branding'
+import { isAdminRole } from '@/lib/auth/roles'
 import { createHash, timingSafeEqual } from 'node:crypto'
 import { downloadTelegramFile, miniAppBotCall } from './bot-api'
 import { miniAppUrl } from './config'
@@ -415,7 +416,7 @@ export async function handleMiniAppUpdate(update: z.infer<typeof telegramUpdateS
     if (action.startsWith('bct:')) {
       const theme = findBroadcastTheme(action.slice(4))
       const account = await prisma.user.findUnique({ where: { telegramId: BigInt(callback.from.id) }, select: { id: true, role: true } })
-      if (account && account.role !== 'USER' && theme) {
+      if (account && isAdminRole(account.role) && theme) {
         await setBotDialogState(account.id, `broadcast:text:${theme.key}`)
         const html = buildBroadcastPromptScreen(await getBotScreenInput(callback.from.id, 'admin'), broadcastThemeView(theme))
         await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
@@ -430,7 +431,7 @@ export async function handleMiniAppUpdate(update: z.infer<typeof telegramUpdateS
         select: { id: true, role: true, botDialog: { select: { state: true } } } })
       const state = account?.botDialog?.state ?? ''
       const theme = state.startsWith('broadcast:preview:') ? findBroadcastTheme(state.slice('broadcast:preview:'.length)) : null
-      if (account && account.role !== 'USER' && theme) {
+      if (account && isAdminRole(account.role) && theme) {
         await setBotDialogState(account.id, `broadcast:text:${theme.key}`)
         const html = buildBroadcastPromptScreen(await getBotScreenInput(callback.from.id, 'admin', 'Отправьте новый текст рассылки.'), broadcastThemeView(theme))
         await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
@@ -446,7 +447,7 @@ export async function handleMiniAppUpdate(update: z.infer<typeof telegramUpdateS
       const state = account?.botDialog?.state ?? ''
       const theme = state.startsWith('broadcast:preview:') ? findBroadcastTheme(state.slice('broadcast:preview:'.length)) : null
       const draft = parseBroadcastDraft(account?.botDialog?.payload)
-      if (!account || account.role === 'USER' || !theme || !draft) {
+      if (!account || !isAdminRole(account.role) || !theme || !draft) {
         const html = await getBotBroadcastThemesScreen(callback.from.id, 'Черновик рассылки не найден. Соберите её заново.')
         await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
         return
@@ -841,7 +842,12 @@ async function handleBotDialogMessage(chatId: number, userId: string, state: str
     const prefix = state.startsWith('broadcast:text:') ? 'broadcast:text:' : 'broadcast:preview:'
     const theme = findBroadcastTheme(state.slice(prefix.length))
     const previousDraft = parseBroadcastDraft(payload)
-    if (!theme) {
+    const author = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } })
+    if (!isAdminRole(author?.role)) {
+      // Рассылки доступны только администраторам: черновик без прав сбрасываем.
+      await clearBotDialogState(userId)
+      html = await getBotScreen(chatId, 'home', 'Раздел доступен администраторам')
+    } else if (!theme) {
       await clearBotDialogState(userId)
       html = await getBotScreen(chatId, 'admin', 'Тема рассылки устарела. Начните заново.')
     } else {

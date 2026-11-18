@@ -12,6 +12,8 @@ export type BotPromoCode = { code: string; discountPercent: number; expiresAt: s
 export type BotPaymentQuote = { amountKopecks: number; starsAmount: number | null }
 export type RichScreenInput = {
   screen: BotScreen
+  /** Полный доступ администратора: статистика, рассылки, панель. Модератору — только обращения. */
+  adminAccess?: boolean
   overview: MiniAppOverview | null
   appUrl: string
   bannerUrl?: string
@@ -238,14 +240,18 @@ export function buildRichScreen(input: RichScreenInput) {
     }
     case 'admin':
       if (input.admin) {
-        if (input.adminStats) parts.push(table([
+        if (input.adminAccess && input.adminStats) parts.push(table([
           ['👥 Пользователи', String(input.adminStats.users)],
           ['📡 Активные подписки', String(input.adminStats.activeSubscriptions)],
           ['💳 Оплаты сегодня', String(input.adminStats.paymentsToday)],
           ['🛟 Открытые тикеты', String(input.adminStats.openTickets)],
         ]))
-        parts.push(row(cb('🛟 Обращения пользователей', 'admt', 'success'), cb('📢 Рассылка', 'bc:new', 'success')))
-        parts.push('<p>Пользователи, платежи и тарифы — в панели управления.</p>', row(app('🛠 Открыть панель управления', 'admin')))
+        if (input.adminAccess) {
+          parts.push(row(cb('🛟 Обращения пользователей', 'admt', 'success'), cb('📢 Рассылка', 'bc:new', 'success')))
+          parts.push('<p>Пользователи, платежи и тарифы — в панели управления.</p>', row(app('🛠 Открыть панель управления', 'admin')))
+        } else {
+          parts.push(row(cb('🛟 Обращения пользователей', 'admt', 'success')))
+        }
       }
       break
   }

@@ -1,4 +1,5 @@
 import { getBrandName } from '@/lib/branding'
+import { isAdminRole, isStaffRole } from '@/lib/auth/roles'
 import { prisma } from '@/lib/prisma'
 import { getMiniAppOverview } from './overview'
 import { buildAdminTicketsScreen, buildBroadcastThemesScreen, buildRichScreen, buildRichPaymentScreen, buildSupportThreadScreen, type BotPaymentQuote, type BotPromoCode, type BotScreen, type BotThreadMessage, type RichScreenInput } from './rich-screens'
@@ -33,7 +34,7 @@ export async function getBotScreenInput(telegramId: number, screen: BotScreen, n
   if (referralCode) appUrl.searchParams.set('ref', referralCode)
   const input: RichScreenInput = { screen, appUrl: appUrl.toString(), overview: user ? await getMiniAppOverview(user.id) : null,
     bannerUrl: miniAppBannerUrl(), brandName: getBrandName(), notice,
-    admin: Boolean(user && user.role !== 'USER') }
+    admin: isStaffRole(user?.role), adminAccess: isAdminRole(user?.role) }
   if (user && input.overview) {
     if (screen === 'devices' && hasRemnawaveUserReference(user)) {
       try {
@@ -100,7 +101,7 @@ export async function getBotScreenInput(telegramId: number, screen: BotScreen, n
       const prefs = await prisma.userNotificationPreference.findUnique({ where: { userId: user.id } })
       input.prefs = { telegram: prefs?.telegramEnabled ?? true, email: prefs?.emailEnabled ?? true, broadcasts: prefs?.broadcastsEnabled ?? true }
     }
-    if (screen === 'admin' && input.admin) {
+    if (screen === 'admin' && input.adminAccess) {
       const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
       const [users, activeSubscriptions, paymentsToday, openTickets] = await Promise.all([
         prisma.user.count(),
@@ -278,7 +279,8 @@ export async function getBotAdminTicketsScreen(telegramId: number, notice?: stri
 // Выбор темы рассылки для администратора.
 export async function getBotBroadcastThemesScreen(telegramId: number, notice?: string) {
   const account = await prisma.user.findUnique({ where: { telegramId: BigInt(telegramId) }, select: { id: true, role: true } })
-  if (!account || account.role === 'USER') return getBotScreen(telegramId, 'home', 'Раздел доступен администраторам')
+  // Рассылки — только администраторам, как POST /api/admin/broadcasts (requireAdmin).
+  if (!account || !isAdminRole(account.role)) return getBotScreen(telegramId, 'home', 'Раздел доступен администраторам')
   const input = await getBotScreenInput(telegramId, 'admin', notice)
   return buildBroadcastThemesScreen(input, broadcastThemes.map(broadcastThemeView))
 }

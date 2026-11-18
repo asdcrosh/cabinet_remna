@@ -1,4 +1,5 @@
 import { getBrandName } from '@/lib/branding'
+import { isAdminRole } from '@/lib/auth/roles'
 import { prisma } from '@/lib/prisma'
 import { isFeatureEnabled } from '@/lib/feature-flags'
 import { rateLimitKey } from '@/lib/rate-limit'
@@ -182,7 +183,7 @@ function parseDraftButton(value: unknown): BroadcastCustomButton | null {
 export async function createBotBroadcast(adminUserId: string, themeKey: string, text: string, image?: string | null,
   customButton?: BroadcastCustomButton | null) {
   const admin = await prisma.user.findUnique({ where: { id: adminUserId }, select: { id: true, role: true } })
-  if (!admin || admin.role === 'USER') return { ok: false as const, error: 'Раздел доступен администраторам.' }
+  if (!admin || !isAdminRole(admin.role)) return { ok: false as const, error: 'Раздел доступен администраторам.' }
   if (!await isFeatureEnabled('broadcasts')) return { ok: false as const, error: 'Рассылки сейчас отключены администратором.' }
   const theme = findBroadcastTheme(themeKey)
   if (!theme) return { ok: false as const, error: 'Тема рассылки не найдена. Начните заново.' }
