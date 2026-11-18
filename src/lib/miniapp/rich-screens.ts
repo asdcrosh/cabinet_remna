@@ -9,6 +9,7 @@ export type BotSpinResult = { prizeTitle: string; prizeDescription: string | nul
 export type BotTicket = { id: string; subject: string; status: string }
 export type BotThreadMessage = { from: 'user' | 'admin'; body: string; date: string; attachments?: Array<{ fileName: string; imageUrl?: string | null }> }
 export type BotPromoCode = { code: string; discountPercent: number; expiresAt: string | null }
+export type BotPaymentQuote = { amountKopecks: number; starsAmount: number | null }
 export type RichScreenInput = {
   screen: BotScreen
   overview: MiniAppOverview | null
@@ -498,22 +499,20 @@ export function buildAutoRenewalOffConfirm(input: RichScreenInput) {
 }
 
 export function buildRichPaymentScreen(input: RichScreenInput, planId: string, botCheckoutGrant: string | null,
-  promo?: { code: string; discountPercent: number } | null) {
+  promo?: Pick<BotPromoCode, 'code' | 'discountPercent'> | null, quote?: BotPaymentQuote | null) {
   const plan = input.overview?.plans.find(item => item.id === planId && !item.isPromo)
   if (!plan) return `${brandHeader(input.bannerUrl, input.brandName)}<h3>💳 Тариф недоступен</h3><p>Откройте актуальный список тарифов.</p>${row(cb('💎 К тарифам', 'plans'))}`
   const checkoutUrl = new URL(input.appUrl)
   checkoutUrl.searchParams.set('tab', 'plans')
   checkoutUrl.searchParams.set('plan', plan.id)
   if (promo) checkoutUrl.searchParams.set('promo', promo.code)
-  const discounted = promo ? Math.round(plan.priceKopecks * (100 - promo.discountPercent) / 100) : null
   const parts = [
     `${brandHeader(input.bannerUrl, input.brandName)}<h3>💳 Способ оплаты</h3>`,
     `<h4>💎 ${escape(plan.name)}</h4>`,
     table([
       ['⏳ Срок', plan.unlimited ? 'Бессрочно' : `${plan.days} дней`],
-      ...(promo && discounted != null
-        ? [['🏷 Промокод', `${promo.code} · −${promo.discountPercent}%`], ['💰 К оплате', formatPrice(discounted)]]
-        : [['💰 Базовая стоимость', formatPrice(plan.priceKopecks)]]),
+      ...(promo ? [['🏷 Промокод', `${promo.code} · −${promo.discountPercent}%`]] : []),
+      ['💰 Стоимость', formatPrice(quote?.amountKopecks ?? plan.priceKopecks)],
     ]),
     '<p>Итоговая сумма со скидками появится перед оплатой.</p>',
   ]
@@ -521,8 +520,9 @@ export function buildRichPaymentScreen(input: RichScreenInput, planId: string, b
   else checkoutUrl.searchParams.set('browserCheckout', '1')
   parts.push(row(`<tg-button type="web_app" style="success" url="${escape(checkoutUrl.toString())}">${botCheckoutGrant ? '💳 Выбрать способ оплаты' : '🌐 Оплата на сайте'}</tg-button>`))
   if (input.overview?.starsEnabled && input.overview.starsRateKopecks) {
-    parts.push(row(cb(promo && discounted != null ? `⭐ Оплатить в Stars · ${formatPrice(discounted)}` : '⭐ Оплатить в Stars',
-      promo ? `buyp:${plan.id}:${promo.code}` : `buy:${plan.id}`)))
+    const label = quote?.starsAmount == null ? '⭐ Оплатить в Stars'
+      : `⭐ Оплатить ${quote.starsAmount.toLocaleString('ru-RU')} Stars`
+    parts.push(row(cb(label, promo ? `buyp:${plan.id}:${promo.code}` : `buy:${plan.id}`)))
   }
   parts.push('<hr><p>Бот и кабинет используют один аккаунт: оплата из любого места продлит ту же подписку.</p>', row(cb('💎 К тарифам', 'plans')))
   return parts.join('')

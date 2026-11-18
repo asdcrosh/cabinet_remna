@@ -4,6 +4,7 @@ import { channelCampaign, isChannelMember, isChannelReference } from './channel-
 import { miniAppDemo } from './model'
 import { isMiniAppOwnedUpdate, isPaymentUpdate, isUnsupportedPaymentUpdate, isUnsupportedCallback, telegramUpdateSchema, validWebhookSecret } from './bot'
 import { starsForKopecks } from './stars'
+import { quoteBotPayment } from './bot-screens'
 
 describe('Telegram Mini App boundaries', () => {
   it('requires the webhook secret and never acknowledges legacy payments', () => {
@@ -66,16 +67,33 @@ describe('Telegram Mini App boundaries', () => {
     expect(html).toContain('остаток прежнего не переносится')
   })
   it('offers browser checkout by default, signed bot checkout when enabled, and Stars', () => {
-    const input = { screen: 'plans' as const, overview: miniAppDemo, appUrl: 'https://cabinet.example.test/miniapp' }
-    const html = buildRichPaymentScreen(input, 'demo', 'signed-grant')
+    const overview = { ...miniAppDemo, plans: [{ ...miniAppDemo.plans[0]!, priceKopecks: 40_000 }] }
+    const input = { screen: 'plans' as const, overview, appUrl: 'https://cabinet.example.test/miniapp' }
+    const quote = quoteBotPayment(overview, 'demo')
+    const html = buildRichPaymentScreen(input, 'demo', 'signed-grant', null, quote)
     expect(html).toContain('type="web_app"')
     expect(html).toContain('https://cabinet.example.test/miniapp?tab=plans&amp;plan=demo')
     expect(html).toContain('avp:buy:demo')
     expect(html).toContain('botCheckout=signed-grant')
-    const defaultCheckout = buildRichPaymentScreen(input, 'demo', null)
+    expect(html).toContain('400 ₽')
+    expect(html).toContain('⭐ Оплатить 134 Stars')
+    const defaultCheckout = buildRichPaymentScreen(input, 'demo', null, null, quote)
     expect(defaultCheckout).toContain('browserCheckout=1')
     expect(defaultCheckout).not.toContain('botCheckout=')
     expect(buildRichPaymentScreen(input, 'unknown', 'signed-grant')).not.toContain('plan=demo')
+    const rublesOnly = buildRichPaymentScreen({ ...input, overview: { ...overview, starsEnabled: false } }, 'demo', null)
+    expect(rublesOnly).toContain('400 ₽')
+    expect(rublesOnly).not.toContain('avp:buy:demo')
+  })
+  it('quotes the default devices and best available discount in both currencies', () => {
+    const overview = { ...miniAppDemo, plans: [{ ...miniAppDemo.plans[0]!, priceKopecks: 40_000,
+      initialDevices: 7, maxDevices: 10, extraDevicePriceKopecks: 7500, deviceAddonEnabled: true }] }
+    const promo = { code: 'SALE10', discountPercent: 10 }
+    const quote = quoteBotPayment(overview, 'demo', promo, { personalDiscountPercent: 15, nextPurchaseDiscountPercent: 0 })
+    const html = buildRichPaymentScreen({ screen: 'plans', overview, appUrl: 'https://cabinet.example.test/miniapp',
+    }, 'demo', null, promo, quote)
+    expect(html).toContain('490 ₽')
+    expect(html).toContain('⭐ Оплатить 164 Stars')
   })
   it('uses one safe brand banner on bot and payment screens', () => {
     const input = { screen: 'home' as const, overview: miniAppDemo,
@@ -177,10 +195,12 @@ describe('Telegram Mini App boundaries', () => {
     expect(promoPlans).toContain('Промокод <b>SALE10</b> применён')
     expect(promoPlans).toContain('avp:payp:')
     expect(promoPlans).toContain('avp:plans')
-    const paymentPromo = buildRichPaymentScreen({ screen: 'plans', overview: miniAppDemo, appUrl,
-      activePromo: { code: 'SALE10', discountPercent: 10 } }, 'demo', 'signed-grant', { code: 'SALE10', discountPercent: 10 })
+    const paymentPromoCode = { code: 'SALE10', discountPercent: 10 }
+    const paymentPromo = buildRichPaymentScreen({ screen: 'plans', overview: miniAppDemo, appUrl }, 'demo', 'signed-grant',
+      paymentPromoCode, quoteBotPayment(miniAppDemo, 'demo', paymentPromoCode))
     expect(paymentPromo).toContain('promo=SALE10')
     expect(paymentPromo).toContain('avp:buyp:demo:SALE10')
+    expect(paymentPromo).toContain('⭐ Оплатить 90 Stars')
   })
   it('gives admins a native ticket queue in the bot', () => {
     const appUrl = 'https://cabinet.example.test/miniapp'

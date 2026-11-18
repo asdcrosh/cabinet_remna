@@ -1,7 +1,7 @@
 import { getBrandName } from '@/lib/branding'
 import { prisma } from '@/lib/prisma'
 import { getMiniAppOverview } from './overview'
-import { buildAdminTicketsScreen, buildBroadcastThemesScreen, buildRichScreen, buildRichPaymentScreen, buildSupportThreadScreen, type BotScreen, type BotThreadMessage, type RichScreenInput } from './rich-screens'
+import { buildAdminTicketsScreen, buildBroadcastThemesScreen, buildRichScreen, buildRichPaymentScreen, buildSupportThreadScreen, type BotPaymentQuote, type BotPromoCode, type BotScreen, type BotThreadMessage, type RichScreenInput } from './rich-screens'
 import { broadcastThemes, broadcastThemeView } from './broadcast-bot'
 import { miniAppBannerUrl, miniAppUrl } from './config'
 import { botSupportAttachmentUrl } from './attachment-sign'
@@ -12,6 +12,11 @@ import { hasRemnawaveUserReference, remnawave, remnawaveUserReference } from '@/
 import { createBotCheckoutGrant, telegramRubleMethods } from './ruble-payments'
 import { isYookassaConfigured } from '@/lib/yookassa'
 import { getFeatureFlags } from '@/lib/feature-flags'
+import { calculatePlanPurchase } from '@/lib/plan-purchase'
+import { calculatePercentDiscount, PromoCodeError } from '@/lib/promo-codes'
+import { calculateUserDiscount } from '@/lib/user-discounts'
+import type { MiniAppOverview } from './model'
+import { starsForKopecks } from './stars'
 
 const paymentStatusLabel: Record<string, string> = { SUCCEEDED: 'Оплачен', PENDING: 'Ожидает оплаты', CANCELED: 'Отменён', REFUNDED: 'Возврат' }
 const autoRenewalLabel: Record<string, string> = {
@@ -150,15 +155,46 @@ export async function getBotScreen(telegramId: number, screen: BotScreen, notice
   return buildRichScreen(await getBotScreenInput(telegramId, screen, notice, referralCode))
 }
 
-export async function getBotPaymentScreen(telegramId: number, planId: string, promo?: { code: string; discountPercent: number } | null) {
+export function quoteBotPayment(overview: MiniAppOverview | null, planId: string,
+  promo?: Pick<BotPromoCode, 'code' | 'discountPercent'> | null, discounts?: Parameters<typeof calculateUserDiscount>[1] | null): BotPaymentQuote | null {
+  const plan = overview?.plans.find(item => item.id === planId && !item.isPromo)
+  if (!plan) return null
+  const pricing = calculatePlanPurchase({
+    priceKopecks: plan.priceKopecks, deviceLimit: plan.devices, maxDeviceLimit: plan.maxDevices,
+    extraDevicePriceKopecks: plan.extraDevicePriceKopecks,
+  }, plan.initialDevices)
+  let promoDiscountKopecks = 0
+  if (promo) {
+    try {
+      promoDiscountKopecks = calculatePercentDiscount(plan.priceKopecks, promo.discountPercent).discountKopecks
+    } catch (error) {
+      if (!(error instanceof PromoCodeError)) throw error
+      return null
+    }
+  }
+  const userDiscount = discounts && calculateUserDiscount(plan.priceKopecks, discounts)
+  const amountKopecks = pricing.originalAmountKopecks - Math.max(promoDiscountKopecks, userDiscount?.discountKopecks ?? 0)
+  let starsAmount: number | null = null
+  if (overview?.starsEnabled && overview.starsRateKopecks) {
+    try {
+      starsAmount = starsForKopecks(amountKopecks, overview.starsRateKopecks)
+    } catch {
+      // Тариф вне диапазона Stars сохраняет цену для оплаты на сайте.
+    }
+  }
+  return { amountKopecks, starsAmount }
+}
+
+export async function getBotPaymentScreen(telegramId: number, planId: string, promo?: Pick<BotPromoCode, 'code' | 'discountPercent'> | null) {
   const hasBotRublePayments = telegramRubleMethods('bot').length > 0
   const [input, account, yookassaAvailable] = await Promise.all([
     getBotScreenInput(telegramId, 'plans'),
-    hasBotRublePayments ? prisma.user.findUnique({ where: { telegramId: BigInt(telegramId) }, select: { id: true } }) : null,
+    prisma.user.findUnique({ where: { telegramId: BigInt(telegramId) },
+      select: { id: true, personalDiscountPercent: true, nextPurchaseDiscountPercent: true } }),
     hasBotRublePayments ? isYookassaConfigured() : false,
   ])
   const grant = account && yookassaAvailable ? createBotCheckoutGrant(account.id, planId) : null
-  return buildRichPaymentScreen(input, planId, grant, promo ?? null)
+  return buildRichPaymentScreen(input, planId, grant, promo, quoteBotPayment(input.overview, planId, promo, account))
 }
 
 // Проверяет, что промокод доступен именно этому пользователю (выдан ему и не использован).
