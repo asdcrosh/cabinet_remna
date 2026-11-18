@@ -5,6 +5,12 @@ import { PromoCodesAdmin, type PromoCodeAdminRow } from '@/components/admin/prom
 import { LazyListLoader } from '@/components/admin/lazy-list-loader'
 import { ADMIN_LIST_PAGE_SIZE, parseAdminListLimit } from '@/lib/admin-list'
 import { cleanupExpiredBonusBoxPromoCodes } from '@/lib/promo-code-cleanup'
+import { getFeatureFlags } from '@/lib/feature-flags'
+import {
+  adminPromoSourceWhere,
+  parseAdminPromoSource,
+  shouldOpenPromoEditor,
+} from '@/lib/admin-promo-source'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Промокоды — Админка' }
@@ -13,14 +19,16 @@ const PROMO_RELATION_PREVIEW_SIZE = 25
 export default async function AdminPromoCodesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ limit?: string; q?: string }>
+  searchParams: Promise<{ limit?: string; q?: string; source?: string; new?: string }>
 }) {
   const { user } = await requireAdminPage()
-  await cleanupExpiredBonusBoxPromoCodes()
+  const [features] = await Promise.all([getFeatureFlags(), cleanupExpiredBonusBoxPromoCodes()])
   const params = await searchParams
   const q = params.q?.trim() ?? ''
   const limit = parseAdminListLimit(params.limit)
-  const where = q
+  // В новом дизайне коды из рулетки — отдельный фильтр, а не общий список с созданными.
+  const source = features.newDesign ? parseAdminPromoSource(params.source) : null
+  const queryWhere = q
     ? {
         OR: [
           { code: { contains: q, mode: 'insensitive' as const } },
@@ -33,8 +41,11 @@ export default async function AdminPromoCodesPage({
         ],
       }
     : undefined
+  const where = source
+    ? { AND: [queryWhere ?? {}, adminPromoSourceWhere(source)] }
+    : queryWhere
 
-  const [total, promoCodes, plans] = await Promise.all([
+  const [total, promoCodes, plans, sourceCounts] = await Promise.all([
     prisma.promoCode.count({ where }),
     prisma.promoCode.findMany({
       where,
@@ -78,6 +89,12 @@ export default async function AdminPromoCodesPage({
       },
     }),
     prisma.plan.findMany({ orderBy: { sortOrder: 'asc' }, select: { id: true, name: true } }),
+    source
+      ? Promise.all([
+          prisma.promoCode.count({ where: { AND: [queryWhere ?? {}, adminPromoSourceWhere('created')] } }),
+          prisma.promoCode.count({ where: { AND: [queryWhere ?? {}, adminPromoSourceWhere('box')] } }),
+        ]).then(([created, box]) => ({ created, box }))
+      : Promise.resolve(null),
   ])
   const promoCodeIds = promoCodes.map((promoCode) => promoCode.id)
   const [redemptionCounts, ownBonusOpenings] = promoCodeIds.length > 0
@@ -146,6 +163,8 @@ export default async function AdminPromoCodesPage({
         promoCodes={rows}
         plans={plans.map((plan) => ({ id: plan.id, name: plan.name }))}
         initialQuery={q}
+        sourceFilter={source && sourceCounts ? { value: source, counts: sourceCounts } : undefined}
+        initialCreateOpen={features.newDesign && shouldOpenPromoEditor(params.new)}
       />
       <LazyListLoader loaded={promoCodes.length} total={total} step={ADMIN_LIST_PAGE_SIZE} />
     </AdminPageShell>
