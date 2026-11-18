@@ -7,6 +7,7 @@ import { buildPlanCatalog } from '@/lib/plan-catalog'
 import type { MiniAppOverview } from './model'
 import { AuthError } from '@/lib/auth/guard'
 import { starsEnabled, starsRateKopecks } from './stars'
+import { isAdminRole } from '@/lib/auth/roles'
 
 export async function getMiniAppOverview(userId: string): Promise<MiniAppOverview> {
   const [user, features, catalog] = await Promise.all([
@@ -36,7 +37,8 @@ export async function getMiniAppOverview(userId: string): Promise<MiniAppOvervie
       planName: local?.plan?.name || getBrandName(), deviceLimit: local?.plan?.unlimitedDevices ? null : local?.deviceLimit ?? local?.plan?.deviceLimit ?? null,
       pending: Boolean(local?.pendingSync) } : null,
     deviceCount: user._count.devices, support: features.support, referrals: features.referrals,
-    admin: user.role !== 'USER',
+    // Раздел «Управление» открывает статистику и панель только для ADMIN/SUPER_ADMIN, как requireAdmin.
+    admin: isAdminRole(user.role),
     starsEnabled: starsEnabled(), starsRateKopecks: starsEnabled() ? starsRateKopecks() : null, warning,
     plans: catalog.plans.map(plan => ({ id: plan.id, name: plan.name, description: plan.description,
         days: plan.durationDays, unlimited: plan.unlimitedDuration, trafficLimitGb: plan.trafficLimitGb,

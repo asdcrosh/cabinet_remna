@@ -238,11 +238,23 @@ describe('Telegram Mini App boundaries', () => {
   })
   it('shows service stats only to admins', () => {
     const html = buildRichScreen({ screen: 'admin', overview: miniAppDemo, appUrl: 'https://cabinet.example.test/miniapp',
-      admin: true, adminStats: { users: 120, activeSubscriptions: 87, paymentsToday: 5, openTickets: 2 } })
+      admin: true, adminAccess: true, adminStats: { users: 120, activeSubscriptions: 87, paymentsToday: 5, openTickets: 2 } })
     expect(html).toContain('Активные подписки')
     expect(html).toContain('tab=admin')
     expect(buildRichScreen({ screen: 'admin', overview: miniAppDemo, appUrl: 'https://cabinet.example.test/miniapp' })).not.toContain('Пользователи')
     expect(buildRichScreen({ screen: 'home', overview: miniAppDemo, appUrl: 'https://cabinet.example.test/miniapp' })).not.toContain('Админка')
+  })
+  it('gives moderators the ticket queue but not stats, broadcasts or the admin panel', () => {
+    const html = buildRichScreen({ screen: 'admin', overview: miniAppDemo, appUrl: 'https://cabinet.example.test/miniapp',
+      admin: true, adminAccess: false, adminStats: { users: 120, activeSubscriptions: 87, paymentsToday: 5, openTickets: 2 } })
+    expect(html).toContain('avp:admt')
+    expect(html).not.toContain('avp:bc:new')
+    expect(html).not.toContain('Активные подписки')
+    expect(html).not.toContain('tab=admin')
+    const adminHtml = buildRichScreen({ screen: 'admin', overview: miniAppDemo, appUrl: 'https://cabinet.example.test/miniapp',
+      admin: true, adminAccess: true })
+    expect(adminHtml).toContain('avp:bc:new')
+    expect(adminHtml).toContain('tab=admin')
   })
   it('runs in-chat actions: device removal, wheel spin and mark-all-read', () => {
     const input = { screen: 'devices' as const, overview: miniAppDemo, appUrl: 'https://cabinet.example.test/miniapp' }

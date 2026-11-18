@@ -117,6 +117,13 @@ describe('createBotBroadcast', () => {
     mocks.prisma.user.findUnique.mockResolvedValue({ id: 'admin-1', role: 'ADMIN' })
   })
 
+  it('rejects moderators: broadcasts are for administrators only, as in the web admin', async () => {
+    mocks.prisma.user.findUnique.mockResolvedValue({ id: 'moderator-1', role: 'MODERATOR' })
+    const result = await createBotBroadcast('moderator-1', 'promo', 'Текст рассылки')
+    expect(result.ok).toBe(false)
+    expect(mocks.createBroadcastCampaign).not.toHaveBeenCalled()
+  })
+
   it('rejects non-admin users', async () => {
     mocks.prisma.user.findUnique.mockResolvedValue({ id: 'user-1', role: 'USER' })
     const result = await createBotBroadcast('user-1', 'promo', 'Текст рассылки')
