@@ -9,7 +9,7 @@ import { BonusBoxPrizesAdminDynamic } from '@/components/admin/bonus-box-prizes-
 import { parseAdminListLimit } from '@/lib/admin-list'
 import { getBonusBoxSettings } from '@/lib/bonus-box'
 import { notFound } from 'next/navigation'
-import { isFeatureEnabled } from '@/lib/feature-flags'
+import { getFeatureFlags } from '@/lib/feature-flags'
 import type {
   BonusAnalyticsAdmin,
   BonusEventAdminRow,
@@ -22,7 +22,9 @@ import {
   getBonusBoxAdminAnalytics,
   type BonusBoxHistoryFilters,
 } from '@/lib/bonus-box-admin'
-import { BonusBoxWorkspace } from '@/components/admin/bonus-box-workspace'
+import { BonusBoxWorkspace, BonusBoxWorkspaceV2 } from '@/components/admin/bonus-box-workspace'
+import { parseBonusAdminTab } from '@/components/admin/bonus-box-workspace-model'
+import { BonusBoxGrantAttemptsButton } from '@/components/admin/bonus-box-grant-attempts-button'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Подарки — Админка' }
@@ -40,7 +42,8 @@ export default async function AdminBonusBoxPage({
     view?: string
   }>
 }) {
-  if (!await isFeatureEnabled('bonusBox')) notFound()
+  const features = await getFeatureFlags()
+  if (!features.bonusBox) notFound()
   const { user: adminUser } = await requireAdminPage()
   const params = await searchParams
   const limit = parseAdminListLimit(params.limit)
@@ -213,6 +216,62 @@ export default async function AdminBonusBoxPage({
     createdAt: signal.createdAt.toISOString(),
   }))
 
+  const canGrantAttempts = adminUser.role === 'SUPER_ADMIN'
+  const historyFilterValues = {
+    q: historyFilters.q ?? '',
+    prizeId: historyFilters.prizeId ?? '',
+    sync: historyFilters.sync ?? '',
+    from: historyFilters.from ?? '',
+    to: historyFilters.to ?? '',
+  }
+
+  if (features.newDesign) {
+    const prizesProps = {
+      prizes: rows,
+      openings: openingRows,
+      settings,
+      totalOpenings,
+      filteredOpenings,
+      pendingSyncCount,
+      historyFilters: historyFilterValues,
+      initialTab: 'prizes' as const,
+      canGrantAttempts,
+      eligibleUsersCount,
+    }
+    const engagementProps = {
+      analytics: analytics as BonusAnalyticsAdmin,
+      missions: missionRows,
+      events: eventRows,
+      riskSignals: riskRows,
+      prizes: rows.map((prize) => ({ id: prize.id, title: prize.title })),
+    }
+
+    // Новый дизайн: один уровень вкладок, массовое начисление — кнопкой в шапке.
+    return (
+      <AdminPageShell
+        title="Бонусы"
+        description="Призы, задания, экономика рулетки и история открытий"
+        action={canGrantAttempts ? <BonusBoxGrantAttemptsButton eligibleUsersCount={eligibleUsersCount} /> : undefined}
+      >
+        <BonusBoxWorkspaceV2
+          initialTab={parseBonusAdminTab(params.view)}
+          panels={{
+            prizes: <BonusBoxPrizesAdminDynamic {...prizesProps} sections={['catalog']} />,
+            engagement: <BonusBoxEngagementAdminDynamic {...engagementProps} sections={['programs']} />,
+            economy: (
+              <div className="page-stack">
+                <BonusBoxEngagementAdminDynamic {...engagementProps} sections={['economy']} />
+                <BonusBoxPrizesAdminDynamic {...prizesProps} sections={['settings']} />
+                <BonusBoxEngagementAdminDynamic {...engagementProps} sections={['risk']} />
+              </div>
+            ),
+            history: <BonusBoxPrizesAdminDynamic {...prizesProps} sections={['history']} />,
+          }}
+        />
+      </AdminPageShell>
+    )
+  }
+
   return (
     <AdminPageShell
       title="Подарки"
@@ -237,15 +296,9 @@ export default async function AdminBonusBoxPage({
             totalOpenings={totalOpenings}
             filteredOpenings={filteredOpenings}
             pendingSyncCount={pendingSyncCount}
-            historyFilters={{
-              q: historyFilters.q ?? '',
-              prizeId: historyFilters.prizeId ?? '',
-              sync: historyFilters.sync ?? '',
-              from: historyFilters.from ?? '',
-              to: historyFilters.to ?? '',
-            }}
+            historyFilters={historyFilterValues}
             initialTab={params.view === 'history' ? 'history' : 'prizes'}
-            canGrantAttempts={adminUser.role === 'SUPER_ADMIN'}
+            canGrantAttempts={canGrantAttempts}
             eligibleUsersCount={eligibleUsersCount}
           />
         )}
