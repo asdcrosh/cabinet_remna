@@ -34,6 +34,7 @@ import {
   RotateCcw,
   Send,
   Search,
+  Settings2,
   Smile,
   Sparkles,
   StickyNote,
@@ -128,6 +129,7 @@ export function SupportPanel({
   initialMessage = '',
   initialNewTicketOpen = false,
   userTitle = 'Поддержка',
+  onEditQuickReplies,
 }: SupportPanelProps) {
   const messagesScrollRef = useRef<HTMLDivElement | null>(null)
   const loadMoreRef = useRef<HTMLDivElement | null>(null)
@@ -1158,7 +1160,7 @@ export function SupportPanel({
                     'relative flex items-end gap-1.5 border border-slate-200/90 bg-white p-1.5 focus-within:border-fuchsia-300 focus-within:ring-4 focus-within:ring-fuchsia-500/[0.06] dark:border-white/10 dark:bg-black/20 dark:focus-within:border-fuchsia-400/30 sm:gap-2',
                     mode === 'admin' ? 'rounded-lg' : 'rounded-2xl shadow-[0_12px_34px_-22px_rgba(15,23,42,0.5)]'
                   )}>
-                    {mode === 'admin' && <QuickReplies mode={mode} replies={adminQuickReplies} onPick={(value) => {
+                    {mode === 'admin' && <QuickReplies mode={mode} replies={adminQuickReplies} onEdit={onEditQuickReplies} onPick={(value) => {
                       setFailedSend(null)
                       setMessage((current) => current.trim() ? `${current.trim()}\n\n${value}` : value)
                     }} />}
@@ -2331,7 +2333,17 @@ function DiagnosticRow({ label, value, ok, mono = false }: { label: string; valu
   )
 }
 
-function QuickReplies({ mode, replies: configuredReplies = [], onPick }: { mode: 'user' | 'admin'; replies?: string[]; onPick: (value: string) => void }) {
+function QuickReplies({
+  mode,
+  replies: configuredReplies = [],
+  onPick,
+  onEdit,
+}: {
+  mode: 'user' | 'admin'
+  replies?: string[]
+  onPick: (value: string) => void
+  onEdit?: () => void
+}) {
   const [open, setOpen] = useState(mode === 'user')
   const replies = mode === 'admin'
     ? configuredReplies.length > 0 ? configuredReplies : [
@@ -2366,7 +2378,25 @@ function QuickReplies({ mode, replies: configuredReplies = [], onPick }: { mode:
         </button>
         {open && (
           <div className="fixed inset-x-3 bottom-[calc(var(--app-mobile-nav-space)+0.5rem)] z-30 overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-xl shadow-slate-950/10 dark:border-slate-800 dark:bg-surface-900 sm:absolute sm:bottom-12 sm:left-0 sm:right-auto sm:w-80">
-            <div className="px-2 pb-1.5 text-xs font-semibold text-slate-400">Шаблоны ответов</div>
+            {onEdit ? (
+              <div className="flex items-center justify-between gap-2 pb-1 pl-2">
+                <span className="text-xs font-semibold text-slate-400">Шаблоны ответов</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOpen(false)
+                    onEdit()
+                  }}
+                  aria-label="Настроить шаблоны и SLA"
+                  title="Настроить шаблоны и SLA"
+                  className="grid h-8 w-8 place-items-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-white/[0.06] dark:hover:text-white"
+                >
+                  <Settings2 className="h-4 w-4" />
+                </button>
+              </div>
+            ) : (
+              <div className="px-2 pb-1.5 text-xs font-semibold text-slate-400">Шаблоны ответов</div>
+            )}
             <div className="space-y-1">
               {replies.map((reply) => (
                 <button

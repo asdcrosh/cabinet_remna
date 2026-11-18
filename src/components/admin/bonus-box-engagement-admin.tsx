@@ -88,6 +88,9 @@ export type BonusAnalyticsAdmin = {
 
 type PrizeOption = { id: string; title: string }
 
+/** Части экрана для плоских вкладок нового дизайна. Без sections — прежний экран целиком. */
+export type BonusEngagementSection = 'economy' | 'programs' | 'risk'
+
 const missionInitial = {
   title: '',
   description: '',
@@ -119,13 +122,16 @@ export function BonusBoxEngagementAdmin({
   events,
   riskSignals,
   prizes,
+  sections,
 }: {
   analytics: BonusAnalyticsAdmin
   missions: BonusMissionAdminRow[]
   events: BonusEventAdminRow[]
   riskSignals: BonusRiskAdminRow[]
   prizes: PrizeOption[]
+  sections?: BonusEngagementSection[]
 }) {
+  const show = (section: BonusEngagementSection) => !sections || sections.includes(section)
   const router = useRouter()
   const [missionForm, setMissionForm] = useState(missionInitial)
   const [eventForm, setEventForm] = useState(eventInitial)
@@ -261,6 +267,7 @@ export function BonusBoxEngagementAdmin({
 
   return (
     <div className="page-stack">
+      {show('economy') && (
       <section className="border-y border-slate-200 py-4 dark:border-white/10">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
@@ -320,7 +327,9 @@ export function BonusBoxEngagementAdmin({
           </div>
         </details>
       </section>
+      )}
 
+      {show('programs') && (
       <section className="grid gap-4 xl:grid-cols-2">
         <AdminProgramBlock title="Задания" meta={`${missions.length}`} icon={<Target className="h-4 w-4" />}>
           <div className="divide-y divide-slate-100 dark:divide-white/10">
@@ -441,7 +450,9 @@ export function BonusBoxEngagementAdmin({
           </details>
         </AdminProgramBlock>
       </section>
+      )}
 
+      {show('risk') && (
       <section className="border-y border-slate-200 py-4 dark:border-white/10">
         <div className="flex items-center justify-between gap-3">
           <div>
@@ -476,6 +487,7 @@ export function BonusBoxEngagementAdmin({
           {riskSignals.length === 0 && <div className="py-4 text-sm text-slate-500">Непроверенных сигналов нет.</div>}
         </div>
       </section>
+      )}
 
       <ConfirmDialog
         open={Boolean(deleteCandidate)}

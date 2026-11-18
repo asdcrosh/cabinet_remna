@@ -6,7 +6,9 @@ import { supportAttachmentSelect } from '@/lib/support-attachments'
 import { parseAdminListLimit } from '@/lib/admin-list'
 import { AdminPageShell } from '@/components/admin/admin-page-shell'
 import { notFound } from 'next/navigation'
-import { isFeatureEnabled } from '@/lib/feature-flags'
+import { getFeatureFlags } from '@/lib/feature-flags'
+import { AdminSupportView } from '@/components/admin/admin-support-view'
+import { canEditSupportSettings, shouldOpenSupportSettings } from '@/lib/support-settings-access'
 import {
   buildAdminSupportAssigneeWhere,
   buildAdminSupportFolderWhere,
@@ -23,9 +25,10 @@ export const metadata = { title: 'Поддержка — Админка' }
 export default async function AdminSupportPage({
   searchParams,
 }: {
-  searchParams: Promise<{ folder?: string; assignee?: string; q?: string; limit?: string; ticket?: string }>
+  searchParams: Promise<{ folder?: string; assignee?: string; q?: string; limit?: string; ticket?: string; settings?: string }>
 }) {
-  if (!await isFeatureEnabled('support')) notFound()
+  const features = await getFeatureFlags()
+  if (!features.support) notFound()
   const { user: currentStaff } = await requireStaffPage()
 
   const params = await searchParams
@@ -112,33 +115,47 @@ export default async function AdminSupportPage({
     }),
   ])
 
+  const panelProps = {
+    mode: 'admin' as const,
+    initialTicketId,
+    slaWarningMinutes: supportSettings.slaWarningMinutes,
+    slaBreachMinutes: supportSettings.slaBreachMinutes,
+    adminQuickReplies: supportSettings.quickReplies,
+    initialTotal: total,
+    pageSize: 25,
+    initialQuery: q,
+    initialFolder: folder,
+    initialAssigneeScope: assigneeScope,
+    currentStaffId: currentStaff.id,
+    staffMembers,
+    initialCounts: {
+      all: allCount,
+      active: activeCount,
+      'need-answer': needAnswerCount,
+      answered: answeredCount,
+      closed: closedCount,
+    },
+    initialTickets: tickets.map((ticket) => ({
+      ...serializeSupportTicket(ticket),
+      messages: ticket.messages.map(serializeSupportMessage),
+    })),
+  }
+
+  // Новый дизайн: шаблоны ответов и SLA — прямо в Поддержке. Права те же, что у API настроек.
+  if (features.newDesign) {
+    return (
+      <AdminSupportView
+        panelProps={panelProps}
+        supportSettings={supportSettings}
+        canEditSettings={canEditSupportSettings(currentStaff.role)}
+        initialSettingsOpen={shouldOpenSupportSettings(params.settings, currentStaff.role)}
+      />
+    )
+  }
+
   return (
     <AdminPageShell title="Поддержка" description="Очередь обращений и переписка с пользователями" variant="plain">
-      <SupportPanelDynamic
-        mode="admin"
-        initialTicketId={initialTicketId}
-        slaWarningMinutes={supportSettings.slaWarningMinutes}
-        slaBreachMinutes={supportSettings.slaBreachMinutes}
-        adminQuickReplies={supportSettings.quickReplies}
-        initialTotal={total}
-        pageSize={25}
-        initialQuery={q}
-        initialFolder={folder}
-        initialAssigneeScope={assigneeScope}
-        currentStaffId={currentStaff.id}
-        staffMembers={staffMembers}
-        initialCounts={{
-          all: allCount,
-          active: activeCount,
-          'need-answer': needAnswerCount,
-          answered: answeredCount,
-          closed: closedCount,
-        }}
-        initialTickets={tickets.map((ticket) => ({
-          ...serializeSupportTicket(ticket),
-          messages: ticket.messages.map(serializeSupportMessage),
-        }))}
-      />
+      <SupportPanelDynamic {...panelProps} />
     </AdminPageShell>
   )
 }

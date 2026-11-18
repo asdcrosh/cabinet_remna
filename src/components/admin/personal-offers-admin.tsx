@@ -15,6 +15,8 @@ import {
   personalOfferScenarioLabels,
   personalOfferToneLabels,
 } from '@/lib/personal-offers'
+import { mergeQuickPromoOptions, type QuickPromoOption } from '@/lib/admin-quick-promo'
+import { QuickPromoCodeCreator, QuickPromoCodeToggle } from '@/components/admin/quick-promo-code-creator'
 
 type Offer = PersonalOfferSetting & {
   promoCode?: { id: string; code: string; discountPercent: number; isActive: boolean } | null
@@ -50,16 +52,25 @@ type WelcomeBonusForm = {
 
 export function PersonalOffersAdmin({
   offers,
-  promoCodes,
+  promoCodes: initialPromoCodes,
   trialPlans,
   welcomeBonusSetting,
+  allowQuickPromoCreate = false,
 }: {
   offers: Offer[]
-  promoCodes: Array<{ id: string; code: string; discountPercent: number }>
+  promoCodes: QuickPromoOption[]
   trialPlans: Array<{ id: string; name: string; durationDays: number }>
   welcomeBonusSetting: WelcomeBonus
+  /** Новый дизайн: промокод можно создать прямо здесь, не уходя в «Промокоды». */
+  allowQuickPromoCreate?: boolean
 }) {
   const router = useRouter()
+  const [createdPromoCodes, setCreatedPromoCodes] = useState<QuickPromoOption[]>([])
+  const [quickPromoTarget, setQuickPromoTarget] = useState<'offer' | 'welcome' | null>(null)
+  const promoCodes = useMemo(
+    () => mergeQuickPromoOptions(createdPromoCodes, initialPromoCodes),
+    [createdPromoCodes, initialPromoCodes]
+  )
   const [editing, setEditing] = useState<Offer | null>(null)
   const [loading, setLoading] = useState(false)
   const [welcomeLoading, setWelcomeLoading] = useState(false)
@@ -86,6 +97,17 @@ export function PersonalOffersAdmin({
     setEditing(offer)
     setForm(toForm(offer))
     setEditorSection('CONTENT')
+    setQuickPromoTarget((current) => (current === 'offer' ? null : current))
+  }
+
+  function closeEdit() {
+    setEditing(null)
+    setQuickPromoTarget((current) => (current === 'offer' ? null : current))
+  }
+
+  function rememberCreatedPromoCode(promoCode: QuickPromoOption) {
+    setCreatedPromoCodes((current) => [promoCode, ...current])
+    setQuickPromoTarget(null)
   }
 
   async function save() {
@@ -97,7 +119,7 @@ export function PersonalOffersAdmin({
         body: JSON.stringify(form),
       })
       toast('Оффер обновлён', 'success')
-      setEditing(null)
+      closeEdit()
       router.refresh()
     } finally {
       setLoading(false)
@@ -194,6 +216,21 @@ export function PersonalOffersAdmin({
                   </option>
                 ))}
               </select>
+              {allowQuickPromoCreate ? (
+                quickPromoTarget === 'welcome' ? (
+                  <QuickPromoCodeCreator
+                    codePrefix="WELCOME"
+                    defaultAudience="NEW_USERS"
+                    onCancel={() => setQuickPromoTarget(null)}
+                    onCreated={(promoCode) => {
+                      rememberCreatedPromoCode(promoCode)
+                      setWelcomeForm((prev) => ({ ...prev, promoCodeId: promoCode.id }))
+                    }}
+                  />
+                ) : (
+                  <QuickPromoCodeToggle onClick={() => setQuickPromoTarget('welcome')} />
+                )
+              ) : null}
             </WelcomeBonusOption>
 
             <WelcomeBonusOption
@@ -287,7 +324,7 @@ export function PersonalOffersAdmin({
         title={activeOffer ? personalOfferScenarioLabels[activeOffer.scenario] : 'Оффер'}
         description="Текст поддерживает подстановки. Ссылка должна вести внутри кабинета."
         size="lg"
-        onClose={() => setEditing(null)}
+        onClose={closeEdit}
       >
         <div className="space-y-5">
           <Tabs
@@ -357,19 +394,36 @@ export function PersonalOffersAdmin({
                   <input className="input" value={form.meta} onChange={(event) => setFormValue('meta', event.target.value)} />
                 </Field>
               </div>
-              <Field label="Промокод для оффера «Давно не покупал»">
-                <select className="input" value={form.promoCodeId} onChange={(event) => setFormValue('promoCodeId', event.target.value)}>
-                  <option value="">Лучший доступный автоматически</option>
-                  {promoCodes.map((promoCode) => <option key={promoCode.id} value={promoCode.id}>{promoCode.code} · {promoCode.discountPercent}%</option>)}
-                </select>
-              </Field>
+              <div>
+                <Field label="Промокод для оффера «Давно не покупал»">
+                  <select className="input" value={form.promoCodeId} onChange={(event) => setFormValue('promoCodeId', event.target.value)}>
+                    <option value="">Лучший доступный автоматически</option>
+                    {promoCodes.map((promoCode) => <option key={promoCode.id} value={promoCode.id}>{promoCode.code} · {promoCode.discountPercent}%</option>)}
+                  </select>
+                </Field>
+                {allowQuickPromoCreate ? (
+                  quickPromoTarget === 'offer' ? (
+                    <QuickPromoCodeCreator
+                      codePrefix="COMEBACK"
+                      defaultDiscount="15"
+                      onCancel={() => setQuickPromoTarget(null)}
+                      onCreated={(promoCode) => {
+                        rememberCreatedPromoCode(promoCode)
+                        setFormValue('promoCodeId', promoCode.id)
+                      }}
+                    />
+                  ) : (
+                    <QuickPromoCodeToggle onClick={() => setQuickPromoTarget('offer')} />
+                  )
+                ) : null}
+              </div>
             </div>
           ) : null}
 
           {editorSection === 'PREVIEW' ? <OfferPreview form={form} /> : null}
 
           <div className="sticky -bottom-5 -mx-4 grid grid-cols-2 gap-2 border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur dark:border-white/10 dark:bg-surface-900/95 sm:-mx-6 sm:flex sm:justify-end sm:px-6">
-            <button type="button" className="btn-secondary justify-center" onClick={() => setEditing(null)} disabled={loading}>
+            <button type="button" className="btn-secondary justify-center" onClick={closeEdit} disabled={loading}>
               Отмена
             </button>
             <button type="button" className="btn-primary justify-center" onClick={() => void save()} disabled={loading}>

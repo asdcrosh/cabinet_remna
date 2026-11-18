@@ -3,8 +3,18 @@
 import { FormEvent, useState } from 'react'
 import { Check, Loader2, Save } from 'lucide-react'
 import type { SupportSettings } from '@/lib/support-settings'
+import { cn } from '@/lib/cn'
 
-export function SupportSettingsPanel({ initialSettings }: { initialSettings: SupportSettings }) {
+export function SupportSettingsPanel({
+  initialSettings,
+  embedded = false,
+  onSaved,
+}: {
+  initialSettings: SupportSettings
+  /** Внутри окна в «Поддержке»: заголовок и рамку даёт само окно. */
+  embedded?: boolean
+  onSaved?: (settings: SupportSettings) => void
+}) {
   const [settings, setSettings] = useState(initialSettings)
   const [templates, setTemplates] = useState(initialSettings.quickReplies.join('\n'))
   const [saving, setSaving] = useState(false)
@@ -27,6 +37,7 @@ export function SupportSettingsPanel({ initialSettings }: { initialSettings: Sup
       setSettings(data.settings)
       setTemplates(data.settings.quickReplies.join('\n'))
       setMessage({ text: 'Настройки поддержки сохранены' })
+      onSaved?.(data.settings)
     } catch (error) {
       setMessage({ text: error instanceof Error ? error.message : 'Не удалось сохранить настройки', error: true })
     } finally {
@@ -35,12 +46,18 @@ export function SupportSettingsPanel({ initialSettings }: { initialSettings: Sup
   }
 
   return (
-    <form onSubmit={save} className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.025]">
-      <div className="border-b border-slate-200 p-4 dark:border-white/[0.07]">
-        <h2 className="text-lg font-semibold">Работа поддержки</h2>
-        <p className="mt-0.5 text-sm text-slate-500">Пороги ожидания ответа и готовые фразы операторов</p>
-      </div>
-      <div className="grid gap-5 p-4 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
+    <form
+      onSubmit={save}
+      aria-label={embedded ? 'Шаблоны ответов и SLA' : undefined}
+      className={embedded ? undefined : 'overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.025]'}
+    >
+      {embedded ? null : (
+        <div className="border-b border-slate-200 p-4 dark:border-white/[0.07]">
+          <h2 className="text-lg font-semibold">Работа поддержки</h2>
+          <p className="mt-0.5 text-sm text-slate-500">Пороги ожидания ответа и готовые фразы операторов</p>
+        </div>
+      )}
+      <div className={cn('grid gap-5 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]', embedded ? 'pb-4' : 'p-4')}>
         <div className="space-y-3">
           <label className="block">
             <span className="mb-1.5 block text-sm font-medium">Предупреждать через, минут</span>
@@ -78,7 +95,10 @@ export function SupportSettingsPanel({ initialSettings }: { initialSettings: Sup
           <span className="mt-1.5 block text-xs text-slate-500">Один шаблон на строку, до 20 шаблонов.</span>
         </label>
       </div>
-      <div className="flex flex-col gap-3 border-t border-slate-200 px-4 py-3 dark:border-white/[0.07] sm:flex-row sm:items-center sm:justify-between">
+      <div className={cn(
+        'flex flex-col gap-3 border-t border-slate-200 dark:border-white/[0.07] sm:flex-row sm:items-center sm:justify-between',
+        embedded ? 'pt-4' : 'px-4 py-3'
+      )}>
         <div role="status" className={message?.error ? 'text-sm text-red-600 dark:text-red-300' : 'text-sm text-slate-500'}>
           {message ? message.text : 'Изменения применятся после сохранения'}
         </div>

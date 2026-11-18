@@ -122,6 +122,8 @@ export interface SupportPanelProps {
   initialNewTicketOpen?: boolean
   /** Заголовок для клиента: «Поддержка» в старом дизайне, «Помощь» в новом. */
   userTitle?: string
+  /** Новый дизайн, только для тех, кто может менять настройки: шестерёнка у шаблонов ответов. */
+  onEditQuickReplies?: () => void
 }
 
 export function buildAdminSupportPath(input: {

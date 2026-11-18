@@ -30,8 +30,13 @@ const amountPresets = [1, 3, 5, 10]
 
 export function BonusBoxAttemptGrantPanel({
   eligibleUsersCount,
+  embedded = false,
+  onGranted,
 }: {
   eligibleUsersCount: number
+  /** Внутри окна «Начислить попытки»: без своей шапки и верхней линии. */
+  embedded?: boolean
+  onGranted?: () => void
 }) {
   const router = useRouter()
   const [audience, setAudience] = useState<Audience>('ALL')
@@ -125,6 +130,7 @@ export function BonusBoxAttemptGrantPanel({
       setOperationId(null)
       if (audience === 'SELECTED') setSelectedUsers({})
       router.refresh()
+      onGranted?.()
     } catch {
       // apiFetch покажет ошибку.
     } finally {
@@ -136,8 +142,13 @@ export function BonusBoxAttemptGrantPanel({
     <>
       <section
         data-testid="bonus-attempt-grant-panel"
-        className="mt-5 border-t border-slate-200 pt-5 dark:border-white/10"
+        className={embedded ? undefined : 'mt-5 border-t border-slate-200 pt-5 dark:border-white/10'}
       >
+        {embedded ? (
+          <div className="text-sm text-slate-500 dark:text-slate-400">
+            Доступно пользователей: <span className="font-semibold text-slate-800 dark:text-slate-200">{eligibleUsersCount}</span>
+          </div>
+        ) : (
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <div className="flex items-center gap-2">
@@ -156,6 +167,7 @@ export function BonusBoxAttemptGrantPanel({
             Доступно пользователей: <span className="font-semibold text-slate-800 dark:text-slate-200">{eligibleUsersCount}</span>
           </div>
         </div>
+        )}
 
         <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
           <div className="min-w-0">

@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { requireAdminPage } from '@/lib/auth/admin-page'
 import { AdminPageShell } from '@/components/admin/admin-page-shell'
 import { PersonalOffersAdmin } from '@/components/admin/personal-offers-admin'
+import { getFeatureFlags } from '@/lib/feature-flags'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Офферы — Админка' }
@@ -14,7 +15,7 @@ export default async function AdminOffersPage() {
       promoCode: { select: { id: true, code: true, discountPercent: true, isActive: true } },
     },
   })
-  const [promoCodes, trialPlans, welcomeBonusSetting] = await Promise.all([
+  const [promoCodes, trialPlans, welcomeBonusSetting, features] = await Promise.all([
     prisma.promoCode.findMany({
       where: { isActive: true, bonusBoxOpenings: { none: {} } },
       orderBy: [{ discountPercent: 'desc' }, { code: 'asc' }],
@@ -40,6 +41,7 @@ export default async function AdminOffersPage() {
         },
       },
     }),
+    getFeatureFlags(),
   ])
   const welcomeBonusForForm = welcomeBonusSetting?.promoCode?.bonusBoxOpenings.length
     ? {
@@ -60,6 +62,7 @@ export default async function AdminOffersPage() {
         promoCodes={promoCodes}
         trialPlans={trialPlans}
         welcomeBonusSetting={welcomeBonusForForm}
+        allowQuickPromoCreate={features.newDesign}
       />
     </AdminPageShell>
   )

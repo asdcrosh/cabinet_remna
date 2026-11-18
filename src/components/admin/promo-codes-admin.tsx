@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useTransition } from 'react'
 import type { ReactNode } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
@@ -15,6 +15,11 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Switch } from '@/components/ui/switch'
 import { ADMIN_LIST_PAGE_SIZE } from '@/lib/admin-list'
+import {
+  ADMIN_PROMO_SOURCES,
+  buildAdminPromoSourceHref,
+  type AdminPromoSource,
+} from '@/lib/admin-promo-source'
 
 type PromoAudience = 'ALL' | 'NEW_USERS' | 'NO_ACTIVE_SUBSCRIPTION' | 'PERSONAL'
 type PromoPurchaseScope = 'ANY' | 'RENEWAL_ONLY'
@@ -85,14 +90,25 @@ const emptyForm: PromoCodeFormState = {
   planIds: [],
 }
 
+export interface PromoSourceFilter {
+  value: AdminPromoSource
+  counts: Record<AdminPromoSource, number>
+}
+
 export function PromoCodesAdmin({
   promoCodes,
   plans,
   initialQuery = '',
+  sourceFilter,
+  initialCreateOpen = false,
 }: {
   promoCodes: PromoCodeAdminRow[]
   plans: PromoPlanOption[]
   initialQuery?: string
+  /** Новый дизайн: созданные коды и коды из рулетки — разные списки. */
+  sourceFilter?: PromoSourceFilter
+  /** Новый дизайн: форма открыта сразу (переход по «Новая скидка» с ?new=1). */
+  initialCreateOpen?: boolean
 }) {
   const router = useRouter()
   const pathname = usePathname()
@@ -100,7 +116,8 @@ export function PromoCodesAdmin({
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState<PromoCodeFormState>(emptyForm)
   const [loading, setLoading] = useState(false)
-  const [editorOpen, setEditorOpen] = useState(false)
+  const [editorOpen, setEditorOpen] = useState(initialCreateOpen)
+  const [sourcePending, startSourceTransition] = useTransition()
   const [tab, setTab] = useState<'AVAILABLE' | 'USED' | 'ARCHIVE'>('AVAILABLE')
   const [origin, setOrigin] = useState<'ALL' | PromoOrigin>('ALL')
   const [query, setQuery] = useState(initialQuery)
@@ -120,6 +137,24 @@ export function PromoCodesAdmin({
   useEffect(() => {
     setQuery(initialQuery)
   }, [initialQuery])
+
+  // ?new=1 нужен только для первого открытия: после обновления страницы форма не должна всплывать снова.
+  useEffect(() => {
+    if (!initialCreateOpen) return
+    const next = new URLSearchParams(window.location.search)
+    if (!next.has('new')) return
+    next.delete('new')
+    window.history.replaceState(null, '', next.toString() ? `${window.location.pathname}?${next.toString()}` : window.location.pathname)
+  }, [initialCreateOpen])
+
+  function changeSource(source: AdminPromoSource) {
+    if (!sourceFilter || source === sourceFilter.value) return
+    setSelectedIds([])
+    setOrigin('ALL')
+    startSourceTransition(() => {
+      router.replace(buildAdminPromoSourceHref(pathname, searchParams, source), { scroll: false })
+    })
+  }
 
   useEffect(() => {
     const handle = window.setTimeout(() => {
@@ -393,7 +428,42 @@ export function PromoCodesAdmin({
           </button>
         </div>
 
-        <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_14rem]">
+        <div className={cn(
+          'mt-3 grid gap-2',
+          !sourceFilter && 'sm:grid-cols-[minmax(0,1fr)_14rem]',
+          sourceFilter?.value === 'created' && 'lg:grid-cols-[auto_minmax(0,1fr)]',
+          sourceFilter?.value === 'box' && 'lg:grid-cols-[auto_minmax(0,1fr)_14rem]'
+        )}>
+          {sourceFilter ? (
+            <div
+              data-testid="promo-source-filter"
+              role="group"
+              aria-label="Откуда промокоды"
+              aria-busy={sourcePending}
+              className="grid grid-cols-2 gap-1 rounded-xl bg-slate-100/80 p-1 dark:bg-white/[0.05]"
+            >
+              {ADMIN_PROMO_SOURCES.map((item) => {
+                const active = sourceFilter.value === item.value
+                return (
+                  <button
+                    key={item.value}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => changeSource(item.value)}
+                    className={cn(
+                      'inline-flex h-10 min-w-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-3 text-sm font-medium transition-colors',
+                      active ? 'bg-slate-950 text-white dark:bg-white dark:text-slate-950' : 'text-slate-500 hover:bg-white/70 dark:hover:bg-white/5'
+                    )}
+                  >
+                    {item.label}
+                    <span className={cn('rounded-full px-1.5 text-xs', active ? 'bg-white/15' : 'bg-white dark:bg-white/10')}>
+                      {sourceFilter.counts[item.value]}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          ) : null}
           <div className="min-w-0">
             <div data-testid="promo-status-filter" aria-label="Статус промокодов" className="grid grid-cols-3 gap-1 rounded-xl bg-slate-100/80 p-1 dark:bg-white/[0.05]">
               {([
@@ -420,23 +490,25 @@ export function PromoCodesAdmin({
             </div>
           </div>
 
-          <div className="min-w-0">
-            <select
-              data-testid="promo-origin-filter"
-              aria-label="Источник промокодов"
-              className="input h-11"
-              value={origin}
-              onChange={(event) => {
-                setOrigin(event.target.value as 'ALL' | PromoOrigin)
-                setSelectedIds([])
-              }}
-            >
-              <option value="ALL">Все · {originCounts.ALL}</option>
-              <option value="CREATED">Созданные · {originCounts.CREATED}</option>
-              <option value="MY_BOX">Мои из бокса · {originCounts.MY_BOX}</option>
-              <option value="OTHER_BOX">Чужие из бокса · {originCounts.OTHER_BOX}</option>
-            </select>
-          </div>
+          {sourceFilter?.value === 'created' ? null : (
+            <div className="min-w-0">
+              <select
+                data-testid="promo-origin-filter"
+                aria-label="Источник промокодов"
+                className="input h-11"
+                value={origin}
+                onChange={(event) => {
+                  setOrigin(event.target.value as 'ALL' | PromoOrigin)
+                  setSelectedIds([])
+                }}
+              >
+                <option value="ALL">{sourceFilter ? 'Все из рулетки' : 'Все'} · {originCounts.ALL}</option>
+                {sourceFilter ? null : <option value="CREATED">Созданные · {originCounts.CREATED}</option>}
+                <option value="MY_BOX">Мои из бокса · {originCounts.MY_BOX}</option>
+                <option value="OTHER_BOX">Чужие из бокса · {originCounts.OTHER_BOX}</option>
+              </select>
+            </div>
+          )}
         </div>
       </section>
 
@@ -771,7 +843,11 @@ export function PromoCodesAdmin({
       {filteredPromoCodes.length === 0 && (
         <AdminEmptyState
           title={query.trim() ? 'Промокоды не найдены' : 'В разделе пока пусто'}
-          description={query.trim() ? 'Измените запрос или очистите поиск.' : 'Создайте промокод или выберите другой статус.'}
+          description={query.trim()
+            ? 'Измените запрос или очистите поиск.'
+            : sourceFilter?.value === 'box'
+              ? 'Здесь появятся промокоды, которые пользователи выиграли в рулетке.'
+              : 'Создайте промокод или выберите другой статус.'}
         />
       )}
       <ConfirmDialog

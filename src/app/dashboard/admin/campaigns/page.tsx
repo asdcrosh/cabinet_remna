@@ -22,6 +22,8 @@ import {
   type AdminCampaignStatus,
   type AdminCampaignType,
 } from '@/lib/admin-campaigns'
+import { getFeatureFlags } from '@/lib/feature-flags'
+import { ADMIN_NEW_PROMO_HREF, adminPromoSourceWhere } from '@/lib/admin-promo-source'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Кампании - Админка' }
@@ -49,6 +51,7 @@ export default async function AdminCampaignsPage({
   await requireAdminPage()
   const params = await searchParams
   const now = new Date()
+  const flags = await getFeatureFlags()
   const [
     promoCodes,
     referralSettings,
@@ -58,6 +61,8 @@ export default async function AdminCampaignsPage({
     features,
   ] = await Promise.all([
     prisma.promoCode.findMany({
+      // В новом дизайне выигрыши рулетки — не акции: они живут отдельным фильтром в «Промокодах».
+      where: flags.newDesign ? adminPromoSourceWhere('created') : undefined,
       orderBy: [{ isActive: 'desc' }, { startsAt: 'asc' }, { createdAt: 'desc' }],
       select: {
         id: true,
@@ -199,7 +204,8 @@ export default async function AdminCampaignsPage({
       title="Кампании"
       description="Все акции и предложения в одном календаре"
       action={(
-        <Link href="/dashboard/admin/promo-codes" className="btn-primary">
+        // В новом дизайне кнопка сразу открывает форму промокода, а не просто список.
+        <Link href={flags.newDesign ? ADMIN_NEW_PROMO_HREF : '/dashboard/admin/promo-codes'} className="btn-primary">
           Новая скидка
         </Link>
       )}

@@ -55,6 +55,8 @@ import {
 } from '@/components/admin/bonus-box-prize-utils'
 
 type AdminBonusTab = 'prizes' | 'history'
+/** Части экрана для плоских вкладок нового дизайна. Без sections — прежний экран целиком. */
+export type BonusBoxPrizesSection = 'catalog' | 'settings' | 'history'
 
 export type { BonusBoxOpeningAdminRow, BonusBoxPrizeAdminRow, BonusBoxSettingsAdminRow }
 type FormState = BonusBoxPrizeFormState
@@ -71,6 +73,7 @@ export function BonusBoxPrizesAdmin({
   initialTab,
   canGrantAttempts,
   eligibleUsersCount,
+  sections,
 }: {
   prizes: BonusBoxPrizeAdminRow[]
   openings: BonusBoxOpeningAdminRow[]
@@ -88,7 +91,11 @@ export function BonusBoxPrizesAdmin({
   initialTab: AdminBonusTab
   canGrantAttempts: boolean
   eligibleUsersCount: number
+  sections?: BonusBoxPrizesSection[]
 }) {
+  // Плоский режим (новый дизайн): без свёрнутых блоков и подвкладок, массовое начисление — в шапке раздела.
+  const flat = Boolean(sections)
+  const show = (section: BonusBoxPrizesSection) => !sections || sections.includes(section)
   const router = useRouter()
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState<FormState>(emptyForm)
@@ -223,8 +230,76 @@ export function BonusBoxPrizesAdmin({
     }))
   }
 
+  const retrySyncButton = pendingSyncCount > 0 ? (
+    <button
+      type="button"
+      className="btn-secondary w-full shrink-0 justify-center sm:w-auto"
+      onClick={retryPendingSyncs}
+      disabled={syncLoading}
+    >
+      <RefreshCw className={cn('h-4 w-4', syncLoading && 'animate-spin')} />
+      {syncLoading ? 'Повторяем...' : 'Повторить начисления'}
+    </button>
+  ) : null
+
+  const settingsFields = (
+    <>
+      <div className="grid gap-3 xl:grid-cols-2">
+        <SettingsCard
+          title="Гарантия редкого"
+          description="Гарантировать редкий приз после серии обычных исходов."
+          checked={settingsForm.pityEnabled}
+          onToggle={(checked) => setSettingsForm((current) => ({ ...current, pityEnabled: checked }))}
+          fieldLabel="Открытий до гарантии"
+          fieldValue={settingsForm.pityOpenings}
+          fieldMin={2}
+          fieldMax={100}
+          fieldDisabled={!settingsForm.pityEnabled}
+          onFieldChange={(value) => setSettingsForm((current) => ({ ...current, pityOpenings: value }))}
+        />
+        <SettingsCard
+          title="Лучший выигрыш"
+          description="Показывать лучший недавний результат пользователя."
+          checked={settingsForm.showBestRecentOpening}
+          onToggle={(checked) => setSettingsForm((current) => ({ ...current, showBestRecentOpening: checked }))}
+          fieldLabel="Промокодов в кабинете"
+          fieldValue={settingsForm.activePromoRewardsLimit}
+          fieldMin={0}
+          fieldMax={12}
+          onFieldChange={(value) => setSettingsForm((current) => ({ ...current, activePromoRewardsLimit: value }))}
+        />
+        <SettingsCard
+          title="Объединение промокодов"
+          description="Пользователь меняет несколько своих промокодов из рулетки на один: max(лучший, ⌊сумма × коэффициент⌋), не выше потолка."
+          checked={settingsForm.promoMergeEnabled}
+          onToggle={(checked) => setSettingsForm((current) => ({ ...current, promoMergeEnabled: checked }))}
+          fieldLabel="Потолок скидки, %"
+          fieldValue={settingsForm.promoMergeCapPercent}
+          fieldMin={5}
+          fieldMax={99}
+          fieldDisabled={!settingsForm.promoMergeEnabled}
+          onFieldChange={(value) => setSettingsForm((current) => ({ ...current, promoMergeCapPercent: value }))}
+          extraField={{
+            label: 'Коэффициент суммы, %',
+            value: settingsForm.promoMergeCoefficient,
+            min: 10,
+            max: 100,
+            onChange: (value) => setSettingsForm((current) => ({ ...current, promoMergeCoefficient: value })),
+          }}
+        />
+      </div>
+      <div className="mt-3 flex justify-end">
+        <button type="button" className="btn-primary w-full justify-center sm:w-auto" onClick={saveSettings} disabled={settingsLoading}>
+          <ShieldCheck className="h-4 w-4" />
+          {settingsLoading ? 'Сохраняем...' : 'Сохранить настройки'}
+        </button>
+      </div>
+    </>
+  )
+
   return (
     <div className="page-stack">
+      {show('catalog') && (
       <section className="rounded-3xl border border-slate-200 bg-white p-4 dark:border-white/[0.08] dark:bg-white/[0.035] sm:p-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0">
@@ -232,17 +307,7 @@ export function BonusBoxPrizesAdmin({
               <p className="mt-1 text-sm text-slate-500">Вес определяет шанс среди активных исходов.</p>
             </div>
             <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
-              {pendingSyncCount > 0 && (
-                <button
-                  type="button"
-                  className="btn-secondary w-full shrink-0 justify-center sm:w-auto"
-                  onClick={retryPendingSyncs}
-                  disabled={syncLoading}
-                >
-                  <RefreshCw className={cn('h-4 w-4', syncLoading && 'animate-spin')} />
-                  {syncLoading ? 'Повторяем...' : 'Повторить начисления'}
-                </button>
-              )}
+              {retrySyncButton}
               <button type="button" className="btn-primary w-full shrink-0 justify-center sm:w-auto" onClick={startCreate}>
                 <Plus className="h-4 w-4" />
                 Создать подарок
@@ -283,66 +348,32 @@ export function BonusBoxPrizesAdmin({
             </div>
           )}
       </section>
+      )}
 
+      {flat && show('settings') && (
+        <section
+          aria-labelledby="bonus-roulette-settings-title"
+          className="rounded-3xl border border-slate-200 bg-white p-4 dark:border-white/[0.08] dark:bg-white/[0.035] sm:p-5"
+        >
+          <h2 id="bonus-roulette-settings-title" className="text-lg font-semibold tracking-tight text-slate-950 dark:text-white">Настройки рулетки</h2>
+          <p className="mt-1 text-sm text-slate-500">Гарантия редкого приза, промокоды в кабинете и их объединение.</p>
+          <div className="mt-4">{settingsFields}</div>
+        </section>
+      )}
+
+      {!flat && (
       <details className="overflow-hidden rounded-3xl border border-slate-200 bg-white dark:border-white/[0.08] dark:bg-white/[0.035]">
         <summary className="cursor-pointer px-4 py-3 font-semibold">Настройки рулетки</summary>
         <div className="border-t border-slate-100 p-4 dark:border-white/10">
-          <div className="grid gap-3 xl:grid-cols-2">
-            <SettingsCard
-              title="Гарантия редкого"
-              description="Гарантировать редкий приз после серии обычных исходов."
-              checked={settingsForm.pityEnabled}
-              onToggle={(checked) => setSettingsForm((current) => ({ ...current, pityEnabled: checked }))}
-              fieldLabel="Открытий до гарантии"
-              fieldValue={settingsForm.pityOpenings}
-              fieldMin={2}
-              fieldMax={100}
-              fieldDisabled={!settingsForm.pityEnabled}
-              onFieldChange={(value) => setSettingsForm((current) => ({ ...current, pityOpenings: value }))}
-            />
-            <SettingsCard
-              title="Лучший выигрыш"
-              description="Показывать лучший недавний результат пользователя."
-              checked={settingsForm.showBestRecentOpening}
-              onToggle={(checked) => setSettingsForm((current) => ({ ...current, showBestRecentOpening: checked }))}
-              fieldLabel="Промокодов в кабинете"
-              fieldValue={settingsForm.activePromoRewardsLimit}
-              fieldMin={0}
-              fieldMax={12}
-              onFieldChange={(value) => setSettingsForm((current) => ({ ...current, activePromoRewardsLimit: value }))}
-            />
-            <SettingsCard
-              title="Объединение промокодов"
-              description="Пользователь меняет несколько своих промокодов из рулетки на один: max(лучший, ⌊сумма × коэффициент⌋), не выше потолка."
-              checked={settingsForm.promoMergeEnabled}
-              onToggle={(checked) => setSettingsForm((current) => ({ ...current, promoMergeEnabled: checked }))}
-              fieldLabel="Потолок скидки, %"
-              fieldValue={settingsForm.promoMergeCapPercent}
-              fieldMin={5}
-              fieldMax={99}
-              fieldDisabled={!settingsForm.promoMergeEnabled}
-              onFieldChange={(value) => setSettingsForm((current) => ({ ...current, promoMergeCapPercent: value }))}
-              extraField={{
-                label: 'Коэффициент суммы, %',
-                value: settingsForm.promoMergeCoefficient,
-                min: 10,
-                max: 100,
-                onChange: (value) => setSettingsForm((current) => ({ ...current, promoMergeCoefficient: value })),
-              }}
-            />
-          </div>
-          <div className="mt-3 flex justify-end">
-            <button type="button" className="btn-primary w-full justify-center sm:w-auto" onClick={saveSettings} disabled={settingsLoading}>
-              <ShieldCheck className="h-4 w-4" />
-              {settingsLoading ? 'Сохраняем...' : 'Сохранить настройки'}
-            </button>
-          </div>
+          {settingsFields}
           {canGrantAttempts && (
             <BonusBoxAttemptGrantPanel eligibleUsersCount={eligibleUsersCount} />
           )}
         </div>
       </details>
+      )}
 
+      {!flat && (
       <div
         className="grid grid-cols-2 gap-1 rounded-2xl bg-slate-100 p-1 dark:bg-white/[0.05]"
         role="tablist"
@@ -368,12 +399,13 @@ export function BonusBoxPrizesAdmin({
           onClick={() => setActiveTab('history')}
         />
       </div>
+      )}
 
-      {activeTab === 'prizes' && (
+      {(flat ? show('catalog') : activeTab === 'prizes') && (
         <section
-          id="bonus-admin-panel-prizes"
-          role="tabpanel"
-          aria-labelledby="bonus-admin-tab-prizes"
+          {...(flat
+            ? { 'aria-label': 'Состав призов' }
+            : { id: 'bonus-admin-panel-prizes', role: 'tabpanel', 'aria-labelledby': 'bonus-admin-tab-prizes' })}
           className="overflow-hidden rounded-3xl border border-slate-200 bg-white divide-y divide-slate-200 dark:border-white/10 dark:bg-white/[0.025] dark:divide-white/[0.07]"
         >
           {prizes.map((prize) => (
@@ -394,11 +426,11 @@ export function BonusBoxPrizesAdmin({
         </section>
       )}
 
-      {activeTab === 'history' && (
+      {(flat ? show('history') : activeTab === 'history') && (
         <div
-          id="bonus-admin-panel-history"
-          role="tabpanel"
-          aria-labelledby="bonus-admin-tab-history"
+          {...(flat
+            ? {}
+            : { id: 'bonus-admin-panel-history', role: 'tabpanel', 'aria-labelledby': 'bonus-admin-tab-history' })}
           className="space-y-4"
         >
           <BonusBoxOpeningHistory
@@ -406,11 +438,13 @@ export function BonusBoxPrizesAdmin({
             prizes={prizes}
             filters={historyFilters}
             total={filteredOpenings}
+            action={flat ? retrySyncButton : null}
           />
           <LazyListLoader loaded={openings.length} total={filteredOpenings} />
         </div>
       )}
 
+      {show('catalog') && (
       <PrizeEditorDrawer
         open={drawerOpen}
         editingPrize={editingPrize}
@@ -422,6 +456,7 @@ export function BonusBoxPrizesAdmin({
         onTypeChange={changePrizeType}
         estimatedChance={estimatedChance}
       />
+      )}
     </div>
   )
 }
@@ -851,6 +886,7 @@ function BonusBoxOpeningHistory({
   prizes,
   filters,
   total,
+  action,
 }: {
   openings: BonusBoxOpeningAdminRow[]
   prizes: BonusBoxPrizeAdminRow[]
@@ -862,7 +898,14 @@ function BonusBoxOpeningHistory({
     to: string
   }
   total: number
+  action?: ReactNode
 }) {
+  const totalBadge = (
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 dark:bg-white/10 dark:text-slate-300">
+      <Clock3 className="h-3.5 w-3.5" />
+      {total}
+    </span>
+  )
   const exportParams = new URLSearchParams()
   if (filters.q) exportParams.set('q', filters.q)
   if (filters.prizeId) exportParams.set('prize', filters.prizeId)
@@ -878,10 +921,12 @@ function BonusBoxOpeningHistory({
             Последние исходы, пользователи и промокоды для контроля начислений.
           </p>
         </div>
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 dark:bg-white/10 dark:text-slate-300">
-          <Clock3 className="h-3.5 w-3.5" />
-          {total}
-        </span>
+        {action ? (
+          <div className="flex flex-wrap items-center gap-2">
+            {action}
+            {totalBadge}
+          </div>
+        ) : totalBadge}
       </div>
 
       <AutoSubmitForm action="/dashboard/admin/bonus-box" className="grid gap-2 border-y border-slate-100 py-3 dark:border-white/10 sm:grid-cols-2 xl:grid-cols-[1.2fr_1fr_0.8fr_0.8fr_0.8fr]">
